@@ -1,0 +1,5 @@
+MANIFEST
+README
+extconf.rb
+fb.c
+mkmf.cmd

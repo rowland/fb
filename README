@@ -1,0 +1,160 @@
+
+			Ruby  InterBase  Module
+
+
+1. Import extension library
+
+  When you use interbase library, firstly you have to require it.
+
+    require "interbase"
+
+  The following objects are defined in this extension.
+
+    * InterBase module
+    * InterBase::Connection class
+    * InterBase::Cursor class
+    * InterBase::Blob class (not working yet)
+
+  The following conventions used in syntax statements of this document.
+
+    []  Square brackets enclose optional parameters or arguments.
+    |   The pipe symbol separates multiple choices, one of which
+        may be used.
+
+2. InterBase module
+
+<module function>
+
+connect(database[,username,password,charset])
+        database <String>         Database name
+        username <String>         User name
+        password <String>         Password
+        charset <String>          Character set  (default: NONE)
+
+	exapmle:
+
+        con = InterBase::connect('/home/db1.gdb', 'usr1', 'ps1')
+
+transaction([option,db...])
+	option <String>		transaction option
+	db <Connection>		Databases
+
+      Start the new transaction.  The syntax of option is same as
+      InterBase's "SET TRANSACTION".  The default option is following,
+
+        READ WRITE NO WAIT ISOLATION LEVEL SNAPSHOT
+
+      If no connection specified, all available connection will be the
+      target.
+
+commit
+
+      Commit the active transaction.
+
+rollback
+
+      Rollback the active transaction.
+
+3. InterBase::Connection class
+
+<class methods>
+
+connect(database[,username,password,charset])
+open(database[,username,password,charset])
+new(database[,username,password,charset])
+        database <String>         Database name
+        username <String>         User name
+        password <String>         Password
+        charset <String>          Character set  (default: NONE)
+
+      Returns new connection.
+
+<methods>
+
+close
+
+      Close the connection now.  If there is an active transaction, it will
+      be rollbacked.
+
+commit
+
+      Commit the active transaction.
+
+cursor
+
+      Returns a new cursor object.
+
+execute(sql[,arg...])
+	sql <String>		SQL statement
+	arg <any>		Argument to the above SQL statement
+
+      Returns a newly created cursor object on success; nil on failure.
+
+    <ex.>
+        conn.execute('select * from table1 where field1=?', 10)
+        conn.execute('select * from table1 where field1=? and field2=?', 10, 'text1')
+        conn.execute('insert into table1(field1, field2) values(?, ?)', 10, 'text1')
+
+transaction([option])
+	option <String>		transaction option
+
+      Start the new transaction.  The syntax of option is same as
+      InterBase's "SET TRANSACTION".  The default option is following,
+
+        READ WRITE NO WAIT ISOLATION LEVEL SNAPSHOT
+
+rollback
+
+      Rollback the active transaction.
+
+
+4 InterBase::Cursor class
+
+<methods>
+
+close
+
+    Close the cursor.
+
+drop
+
+   Drop (throw away) the cursor.
+
+description
+
+   Returns the field information.
+
+each{|record|...}
+
+   Iterates over each row of a query result.
+
+execute(sql[,arg...])
+	sql <String>		SQL statement
+	arg <any>		Argument to the above SQL statement
+
+      Executes the SQL statement.
+
+    <ex.>
+        cur.execute('select * from table1 where field1=?', 10)
+        cur.execute('select * from table1 where field1=? and field2=?', 10, 'text1')
+        cur.execute('insert into table1(field1, field2) values(?, ?)', 10, 'text1')
+
+fetchone
+
+    Fetch the next row of a query result, returning a single tuple.
+
+fetchall
+
+    Fetch all rows of a query result, returning as a list of tuples.
+
+4 Blob object
+
+Not yet available.
+
+5. Changes
+
+0.01 - 1999-06-11 - baseline 
+0.02 - 1999-07-16 - memory bug in ibconn_cursor, English documents.
+0.03 - ???
+0.04 - 2001-08-17 - insert, fetch blobs as strings
+0.05 - 2001-09-05 - add block syntax for Connection#connect and Connection#execute
