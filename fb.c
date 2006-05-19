@@ -46,7 +46,6 @@
 static VALUE rb_mFb;
 static VALUE rb_cFbConnection;
 static VALUE rb_cFbCursor;
-static VALUE rb_cFbBlob;
 static VALUE rb_eFbError;
 
 static long isc_status[20];	/* status vector */
@@ -115,9 +114,7 @@ static int db_num = 0;
 #define	FREE(p)		if (p)	{ free(p); p = 0; }
 #define	SETNULL(p)	if (p && strlen(p) == 0)	{ p = 0; }
 
-static long
-calculate_buffsize(sqlda)
-    XSQLDA *sqlda;
+static long calculate_buffsize(XSQLDA *sqlda)
 {
 	XSQLVAR *var;
 	long cols;
@@ -148,8 +145,7 @@ calculate_buffsize(sqlda)
 	return offset;
 }
 
-static void
-ib_error_check()
+static void ib_error_check()
 {
 	short code = isc_sqlcode(isc_status);
 
@@ -164,8 +160,7 @@ ib_error_check()
 	}
 }
 
-static void
-ib_error_check_warn()
+static void ib_error_check_warn()
 {
 	short code = isc_sqlcode(isc_status);
 	if (code != 0) {
@@ -175,9 +170,7 @@ ib_error_check_warn()
 	}
 }
 
-static XSQLDA*
-sqlda_alloc(cols)
-	long cols;
+static XSQLDA* sqlda_alloc(long cols)
 {
 	XSQLDA *sqlda;
 
@@ -202,17 +195,14 @@ static void curs_mark();
 static void curs_free();
 
 /* connection utilities */
-static void
-conn_check(conn)
-	struct IBconn *conn;
+static void conn_check(struct IBconn *conn)
 {
 	if (conn->db == 0) {
 		rb_raise(rb_eFbError, "closed db connection");
 	}
 }
 
-static void
-conn_close_cursors()
+static void conn_close_cursors()
 {
 	struct IBconn *list = ibconn_list;
 	int i;
@@ -225,9 +215,7 @@ conn_close_cursors()
 	}
 }
 
-static void
-conn_drop_cursors(conn)
-	struct IBconn *conn;
+static void conn_drop_cursors(struct IBconn *conn)
 {
 	int i;
 
@@ -237,9 +225,7 @@ conn_drop_cursors(conn)
 	RARRAY(conn->curs)->len = 0;
 }
 
-static void
-conn_remove(conn)
-	struct IBconn *conn;
+static void conn_remove(struct IBconn *conn)
 {
 	conn->db = 0;
 	db_num--;
@@ -258,9 +244,7 @@ conn_remove(conn)
 	}
 }
 
-static void
-conn_disconnect(conn)
-	struct IBconn *conn;
+static void conn_disconnect(struct IBconn *conn)
 {
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
@@ -271,9 +255,7 @@ conn_disconnect(conn)
 	conn_remove(conn);
 }
 
-static void
-conn_disconnect_warn(conn)
-	struct IBconn *conn;
+static void conn_disconnect_warn(struct IBconn *conn)
 {
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
@@ -284,16 +266,12 @@ conn_disconnect_warn(conn)
 	conn_remove(conn);
 }
 
-static void
-conn_mark(conn)
-	struct IBconn *conn;
+static void conn_mark(struct IBconn *conn)
 {
 	rb_gc_mark(conn->curs);
 }
 
-static void
-conn_free(conn)
-	struct IBconn *conn;
+static void conn_free(struct IBconn *conn)
 {
 	if (conn->db) {
 		conn_disconnect_warn(conn);
@@ -301,9 +279,7 @@ conn_free(conn)
 	free(conn);
 }
 
-static struct IBconn*
-conn_check_retrieve(data)
-	VALUE data;
+static struct IBconn* conn_check_retrieve(VALUE data)
 {
 	if (TYPE(data) != T_DATA || RDATA(data)->dfree != (void *)conn_free) {
 		rb_raise(rb_eTypeError, "wrong argument type %s (expected InterBase::Connection)",
@@ -312,9 +288,7 @@ conn_check_retrieve(data)
 	return (struct IBconn*)RDATA(data)->data;
 }
 
-static unsigned short
-conn_db_SQL_Dialect(conn)
-	struct IBconn *conn;
+static unsigned short conn_db_SQL_Dialect(struct IBconn *conn)
 {
 	long dialect;
 	long length;
@@ -336,16 +310,12 @@ conn_db_SQL_Dialect(conn)
 	return dialect;
 }
 
-static unsigned short
-conn_dialect(conn)
-	struct IBconn *conn;
+static unsigned short conn_dialect(struct IBconn *conn)
 {
 	return conn->dialect;
 }
 
-static unsigned short
-conn_db_dialect(conn)
-	struct IBconn *conn;
+static unsigned short conn_db_dialect(struct IBconn *conn)
 {
 	return conn->db_dialect;
 }
@@ -406,10 +376,7 @@ static trans_opts	trans_opt_S[] =
 #define	RESV_WRITE	"WRITE"
 #define	RESV_CONTINUE	','
 
-static char*
-trans_parseopts(opt, tpb_len)
-	VALUE *opt;
-	int *tpb_len;
+static char* trans_parseopts(VALUE opt, int *tpb_len)
 {
 	char *s, *trans;
 	long used;
@@ -665,12 +632,7 @@ error:
 	rb_raise(rb_eFbError, desc);
 }
 
-static void
-set_teb_vec(vec, conn, tpb, len)
-	ISC_TEB *vec;
-	struct IBconn *conn;
-	char *tpb;
-	int len;
+static void set_teb_vec(ISC_TEB *vec, struct IBconn *conn, char *tpb, int len)
 {
 	vec->dbb_ptr = &conn->db;
 	if (tpb) {
@@ -683,11 +645,7 @@ set_teb_vec(vec, conn, tpb, len)
 	}
 }
 
-static void
-trans_start(opt, argc, argv)
-	VALUE opt;
-	int argc;
-	VALUE *argv;
+static void trans_start(VALUE opt, int argc, VALUE *argv)
 {
 	struct IBconn *conn;
 	ISC_TEB *teb_vec = ALLOCA_N(ISC_TEB, db_num);
@@ -728,11 +686,7 @@ trans_start(opt, argc, argv)
 }
 
 /* transaction method */
-static VALUE
-ib_transaction(argc, argv, self)
-	int argc;
-	VALUE *argv;
-	VALUE self;
+static VALUE ib_transaction(int argc, VALUE *argv, VALUE self)
 {
 	VALUE opt = Qnil;
 
@@ -744,8 +698,7 @@ ib_transaction(argc, argv, self)
 	return Qnil;
 }
 
-static VALUE
-ib_commit()
+static VALUE ib_commit()
 {
 	conn_close_cursors();
 	if (transact) {
@@ -756,8 +709,7 @@ ib_commit()
 	return Qnil;
 }
 
-static VALUE
-ib_rollback()
+static VALUE ib_rollback()
 {
 	conn_close_cursors();
 	if (transact) {
@@ -768,20 +720,13 @@ ib_rollback()
 	return Qnil;
 }
 
-static VALUE
-ib_connect(argc, argv)
-	int argc;
-	VALUE *argv;
+static VALUE ib_connect(int argc, VALUE *argv)
 {
 	return ibconn_s_new(argc, argv, rb_cFbConnection);
 }
 
 /* connection methods */
-static VALUE
-ibconn_s_new(argc, argv, klass)
-	int argc;
-	VALUE *argv;
-	VALUE klass;
+static VALUE ibconn_s_new(int argc, VALUE *argv, VALUE klass)
 {
 	VALUE a, b, c, d, obj;
 	char *db, *user, *pass, *charset;
@@ -839,9 +784,7 @@ ibconn_s_new(argc, argv, klass)
 	}
 }
 
-static VALUE
-ibconn_cursor(obj)
-    VALUE obj;
+static VALUE ibconn_cursor(VALUE obj)
 {
 	VALUE c;
 	struct IBconn *conn;
@@ -861,11 +804,7 @@ ibconn_cursor(obj)
 	return c;
 }
 
-static VALUE
-ibconn_execute(argc, argv, obj)
-    int argc;
-    VALUE *argv;
-    VALUE obj;
+static VALUE ibconn_execute(int argc, VALUE *argv, VALUE obj)
 {
 	VALUE curs = ibconn_cursor(obj);
 	VALUE val;
@@ -882,9 +821,7 @@ ibconn_execute(argc, argv, obj)
 	return Qnil;
 }
 
-static VALUE
-ibconn_close(self)
-	VALUE self;
+static VALUE ibconn_close(VALUE self)
 {
 	struct IBconn *conn;
 
@@ -896,9 +833,7 @@ ibconn_close(self)
 	return Qnil;
 }
 
-static VALUE
-ibconn_dialect(self)
-	VALUE self;
+static VALUE ibconn_dialect(VALUE self)
 {
 	struct IBconn *conn;
 
@@ -908,9 +843,7 @@ ibconn_dialect(self)
 	return INT2FIX(conn->dialect);
 }
 
-static VALUE
-ibconn_db_dialect(self)
-	VALUE self;
+static VALUE ibconn_db_dialect(VALUE self)
 {
 	struct IBconn *conn;
 
@@ -921,9 +854,7 @@ ibconn_db_dialect(self)
 }
 
 /* cursor utilities */
-static void
-curs_check(curs)
-	struct IBcurs *curs;
+static void curs_check(struct IBcurs *curs)
 {
 	if (curs->stmt == 0) {
 		rb_raise(rb_eFbError, "dropped db cursor");
@@ -933,9 +864,7 @@ curs_check(curs)
 	}
 }
 
-static void
-curs_drop(curs)
-	struct IBcurs *curs;
+static void curs_drop(struct IBcurs *curs)
 {
 	if (curs->open) {
 		isc_dsql_free_statement(isc_status, &curs->stmt, DSQL_close);
@@ -946,9 +875,7 @@ curs_drop(curs)
 	curs->stmt = 0;
 }
 
-static void
-curs_drop_warn(curs)
-	struct IBcurs *curs;
+static void curs_drop_warn(struct IBcurs *curs)
 {
 	if (curs->open) {
 		isc_dsql_free_statement(isc_status, &curs->stmt, DSQL_close);
@@ -959,17 +886,13 @@ curs_drop_warn(curs)
 	curs->stmt = 0;
 }
 
-static void
-curs_mark(curs)
-	struct IBcurs *curs;
+static void curs_mark(struct IBcurs *curs)
 {
 	rb_gc_mark(curs->conn);
 	rb_gc_mark(curs->describe);
 }
 
-static void
-curs_free(curs)
-	struct IBcurs *curs;
+static void curs_free(struct IBcurs *curs)
 {
 	if (curs->stmt)
 		curs_drop_warn(curs);
@@ -986,11 +909,7 @@ struct time_object {
 #define GetTimeval(obj, tobj) \
     Data_Get_Struct(obj, struct time_object, tobj)
 
-static void
-set_inputparams(curs, argc, argv)
-	struct IBcurs *curs;
-	int argc;
-	VALUE *argv;
+static void set_inputparams(struct IBcurs *curs, int argc, VALUE *argv)
 {
 	struct IBconn *conn;
 	long count;
@@ -1196,11 +1115,7 @@ set_inputparams(curs, argc, argv)
 	}
 }
 
-static void
-execute_withparams(curs, argc, argv)
-	struct IBcurs *curs;
-	int argc;
-	VALUE *argv;
+static void execute_withparams(struct IBcurs *curs, int argc, VALUE *argv)
 {
 	struct IBconn *conn;
 
@@ -1232,9 +1147,7 @@ execute_withparams(curs, argc, argv)
 	}
 }
 
-static VALUE
-curs_description(sqlda)
-	XSQLDA *sqlda;
+static VALUE curs_description(XSQLDA *sqlda)
 {
 	long cols;
 	long count;
@@ -1293,12 +1206,7 @@ curs_description(sqlda)
 }
 
 /* Check the input parameters */
-static void
-curs_check_inparams(curs, argc, argv, exec)
-	struct IBcurs *curs;
-	int argc;
-	VALUE *argv;
-	int exec;
+static void curs_check_inparams(struct IBcurs *curs, int argc, VALUE *argv, int exec)
 {
 	long items;
 
@@ -1321,9 +1229,7 @@ curs_check_inparams(curs, argc, argv, exec)
 	}
 }
 
-static void
-curs_fetch_prep(curs)
-	struct IBcurs *curs;
+static void curs_fetch_prep(struct IBcurs *curs)
 {
 	struct IBconn *conn;
 	long cols;
@@ -1368,9 +1274,7 @@ curs_fetch_prep(curs)
 	}
 }
 
-static VALUE
-curs_fetch(curs)
-	struct IBcurs *curs;
+static VALUE curs_fetch(struct IBcurs *curs)
 {
 	struct IBconn *conn;
 	long cols;
@@ -1548,11 +1452,7 @@ curs_fetch(curs)
 }
 
 /* cursor methods */
-static VALUE
-ibcurs_execute(argc, argv, self)
-	int argc;
-	VALUE *argv;
-	VALUE self;
+static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 {
 	struct IBcurs *curs;
 	struct IBconn *conn;
@@ -1693,9 +1593,7 @@ ibcurs_execute(argc, argv, self)
 	return INT2NUM(STATEMENT_DML);
 }
 
-static VALUE
-ibcurs_fetch(self)
-	VALUE self;
+static VALUE ibcurs_fetch(VALUE self)
 {
 	struct IBcurs *curs;
 
@@ -1705,9 +1603,7 @@ ibcurs_fetch(self)
 	return curs_fetch(curs);
 }
 
-static VALUE
-ibcurs_fetchall(self)
-	VALUE self;
+static VALUE ibcurs_fetchall(VALUE self)
 {
 	VALUE ary, row;
 	struct IBcurs *curs;
@@ -1725,9 +1621,7 @@ ibcurs_fetchall(self)
 	return ary;
 }
 
-static VALUE
-ibcurs_each(self)
-	VALUE self;
+static VALUE ibcurs_each(VALUE self)
 {
 	VALUE ary, row;
 	struct IBcurs *curs;
@@ -1744,9 +1638,7 @@ ibcurs_each(self)
 	return Qnil;
 }
 
-static VALUE
-ibcurs_close(self)
-	VALUE self;
+static VALUE ibcurs_close(VALUE self)
 {
 	struct IBcurs *curs;
 
@@ -1765,9 +1657,7 @@ ibcurs_close(self)
 }
 
 
-static VALUE
-ibcurs_drop(self)
-	VALUE self;
+static VALUE ibcurs_drop(VALUE self)
 {
 	struct IBcurs *curs;
 	struct IBconn *conn;
@@ -1788,9 +1678,7 @@ ibcurs_drop(self)
 	return Qnil;
 }
 
-static VALUE
-ibcurs_description(self)
-	VALUE self;
+static VALUE ibcurs_description(VALUE self)
 {
 	struct IBcurs *curs;
 
@@ -1798,23 +1686,16 @@ ibcurs_description(self)
 	return curs->describe;
 }
 
-static VALUE
-iberr_err_code(err)
-	VALUE err;
+static VALUE iberr_err_code(VALUE err)
 {
 	rb_p(err);
 	return rb_iv_get(err, "error_code");
 }
 
-void
-Init_fb()
+void Init_fb()
 {
 	rb_mFb = rb_define_module("Fb");
-	rb_define_module_function(rb_mFb, "connect", ib_connect, -1);
-	rb_define_module_function(rb_mFb, "transaction", ib_transaction, -1);
-	rb_define_module_function(rb_mFb, "commit", ib_commit, 0);
-	rb_define_module_function(rb_mFb, "rollback", ib_rollback, 0);
-
+	
 	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
 	rb_define_singleton_method(rb_cFbConnection, "new", ibconn_s_new, -1);
 	rb_define_singleton_method(rb_cFbConnection, "open", ibconn_s_new, -1);
@@ -1836,8 +1717,6 @@ Init_fb()
 	rb_define_method(rb_cFbCursor, "each", ibcurs_each, 0);
 	rb_define_method(rb_cFbCursor, "close", ibcurs_close, 0);
 	rb_define_method(rb_cFbCursor, "drop", ibcurs_drop, 0);
-
-	rb_cFbBlob = rb_define_class_under(rb_mFb, "Blob", rb_cData);
 
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
 	rb_define_method(rb_eFbError, "error_code", iberr_err_code, 0);
