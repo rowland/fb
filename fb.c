@@ -1830,7 +1830,7 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 
 static VALUE database_create(VALUE self)
 {
-	isc_db_handle connection = 0;
+	isc_db_handle handle = 0;
 	isc_tr_handle transaction = 0;
 	VALUE parms, fmt, stmt;
 	char *sql;
@@ -1846,14 +1846,22 @@ static VALUE database_create(VALUE self)
 	stmt = rb_funcall(fmt, rb_intern("%"), 1, parms);
 	sql = StringValuePtr(stmt);
 
-	if (isc_dsql_execute_immediate(isc_status, &connection, &transaction, 0, sql, 3, NULL) != 0)
+	if (isc_dsql_execute_immediate(isc_status, &handle, &transaction, 0, sql, 3, NULL) != 0)
 	{
 		ib_error_check();
 	}
-	if (connection)
+	if (handle)
 	{
-		isc_detach_database(isc_status, &connection);
-		ib_error_check();
+		if (rb_block_given_p())
+		{
+			VALUE connection = connection_create(handle);
+			rb_ensure(rb_yield,connection,ibconn_close,connection);
+		}
+		else
+		{
+			isc_detach_database(isc_status, &handle);
+			ib_error_check();
+		}
 	}
 	
 	return self;
@@ -1873,16 +1881,10 @@ static VALUE database_connect(VALUE self)
 	isc_db_handle handle = NULL;
 	VALUE database = rb_iv_get(self, "@database");
 	Check_Type(database, T_STRING);
-	puts("there 0");
 	dbp = connection_create_dbp(self, &length);
-	puts("there 1");
-	puts("there 2");
 	isc_attach_database(isc_status, 0, STR2CSTR(database), &handle, length, dbp);
-	puts("there 3");
 	free(dbp);
-	puts("there 4");
 	ib_error_check();
-	puts("there 5");
 	{
 		VALUE connection = connection_create(handle);
 		puts("there 6");
@@ -1923,7 +1925,7 @@ void Init_fb()
 	rb_define_singleton_method(rb_cFbConnection, "new", ibconn_s_new, -1);
 	rb_define_singleton_method(rb_cFbConnection, "open", ibconn_s_new, -1);
 	rb_define_singleton_method(rb_cFbConnection, "connect", ibconn_s_new, -1);
-	define_attrs(rb_cFbConnection, CONNECTION_PARMS);
+	//define_attrs(rb_cFbConnection, CONNECTION_PARMS);
 	rb_define_method(rb_cFbConnection, "cursor", ibconn_cursor, 0);
 	rb_define_method(rb_cFbConnection, "execute", ibconn_execute, -1);
 	rb_define_method(rb_cFbConnection, "transaction", ib_transaction, -1);
