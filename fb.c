@@ -44,6 +44,7 @@
 #define	EXECF_SETPARM	1
 
 static VALUE rb_mFb;
+static VALUE rb_cFbDatabase;
 static VALUE rb_cFbConnection;
 static VALUE rb_cFbCursor;
 static VALUE rb_eFbError;
@@ -1692,14 +1693,120 @@ static VALUE iberr_err_code(VALUE err)
 	return rb_iv_get(err, "error_code");
 }
 
+static char* CONNECTION_PARMS[6] = {
+	"database",
+	"username",
+	"password",
+	"charset",
+	"role",
+	(char *)0
+};
+
+static void define_attrs(VALUE klass, char **attrs)
+{
+	char *parm;
+	while (parm = *attrs)
+	{
+		rb_define_attr(klass, parm, 1, 1);
+		attrs++;
+	}
+}
+
+static VALUE database_allocate_instance(VALUE klass)
+{
+    NEWOBJ(obj, struct RObject);
+    OBJSETUP(obj, klass, T_OBJECT);
+    return (VALUE)obj;
+}
+
+static VALUE default_string(VALUE hash, char *key, char *def)
+{
+	ID id = rb_intern(key);
+	VALUE sym = ID2SYM(id);
+	VALUE val = rb_hash_aref(hash, sym);
+	val = StringValue(val);
+	return NIL_P(val) ? rb_str_new2(def) : val;
+}
+
+static VALUE default_int(VALUE hash, char *key, int def)
+{
+	ID id = rb_intern(key);
+	VALUE sym = ID2SYM(id);
+	VALUE val = rb_hash_aref(hash, sym);
+	return NIL_P(val) ? INT2NUM(def) : val;
+}
+
+static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
+{
+	if (argc >= 1)
+	{
+		VALUE parms = argv[0];
+		rb_iv_set(self, "@database", rb_hash_aref(parms, ID2SYM(rb_intern("database"))));
+		rb_iv_set(self, "@username", rb_hash_aref(parms, ID2SYM(rb_intern("username"))));
+		rb_iv_set(self, "@password", rb_hash_aref(parms, ID2SYM(rb_intern("password"))));
+		rb_iv_set(self, "@charset", default_string(parms, "charset", "NONE"));
+		rb_iv_set(self, "@role", rb_hash_aref(parms, ID2SYM(rb_intern("role"))));
+		rb_iv_set(self, "@page_size", default_int(parms, "page_size", 1024));
+	}
+	return self;
+}
+
+static VALUE database_create(VALUE self)
+{
+	isc_db_handle connection = 0;
+	isc_tr_handle transaction = 0;
+	VALUE parms, fmt, stmt;
+	char *sql;
+
+	VALUE database = rb_iv_get(self, "@database");
+	VALUE username = rb_iv_get(self, "@username");
+	VALUE password = rb_iv_get(self, "@password");
+	VALUE page_size = rb_iv_get(self, "@page_size");
+	VALUE charset = rb_iv_get(self, "@charset");
+	parms = rb_ary_new3(5, database, username, password, page_size, charset);
+		
+	fmt = rb_str_new2("CREATE DATABASE '%s' USER '%s' PASSWORD '%s' PAGE_SIZE = %d DEFAULT CHARACTER SET %s;");
+	stmt = rb_funcall(fmt, rb_intern("%"), 1, parms);
+	sql = StringValuePtr(stmt);
+
+	if (isc_dsql_execute_immediate(isc_status, &connection, &transaction, 0, sql, 3, NULL) != 0)
+	{
+		ib_error_check();
+		rb_raise(rb_eFbError, "Error creating database.");
+	}
+	if (connection)
+	{
+		isc_detach_database(isc_status, &connection);
+		ib_error_check();
+	}
+	
+	return self;
+}
+
+static VALUE database_s_create(int argc, VALUE *argv, VALUE klass)
+{
+	VALUE obj = database_allocate_instance(klass);
+	database_initialize(argc, argv, obj);
+	return database_create(obj);
+}
+
 void Init_fb()
 {
 	rb_mFb = rb_define_module("Fb");
-	
+
+	rb_cFbDatabase = rb_define_class_under(rb_mFb, "Database", rb_cData);
+    rb_define_alloc_func(rb_cFbDatabase, database_allocate_instance);
+    rb_define_method(rb_cFbDatabase, "initialize", database_initialize, -1);
+    define_attrs(rb_cFbDatabase, CONNECTION_PARMS);
+	rb_define_attr(rb_cFbDatabase, "page_size", 1, 1);
+    rb_define_method(rb_cFbDatabase, "create", database_create, 0);
+	rb_define_singleton_method(rb_cFbDatabase, "create", database_s_create, -1);
+
 	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
 	rb_define_singleton_method(rb_cFbConnection, "new", ibconn_s_new, -1);
 	rb_define_singleton_method(rb_cFbConnection, "open", ibconn_s_new, -1);
 	rb_define_singleton_method(rb_cFbConnection, "connect", ibconn_s_new, -1);
+    
 	rb_define_method(rb_cFbConnection, "cursor", ibconn_cursor, 0);
 	rb_define_method(rb_cFbConnection, "execute", ibconn_execute, -1);
 	rb_define_method(rb_cFbConnection, "transaction", ib_transaction, -1);
