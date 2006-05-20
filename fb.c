@@ -1693,6 +1693,81 @@ static VALUE iberr_err_code(VALUE err)
 	return rb_iv_get(err, "error_code");
 }
 
+static char* dbp_create(int *length)
+{
+	char *dbp = ALLOC_N(char, 1);
+	*dbp = isc_dpb_version1;
+	*length = 1;
+	return dbp;
+}
+
+static char* dbp_add_string(char *dbp, char isc_dbp_code, char *s, int *length)
+{
+	char *buf;
+	int old_length = *length;
+	int s_len = strlen(s);
+	*length += 2 + s_len;
+	REALLOC_N(dbp, char, *length);
+	buf = dbp + old_length;
+	*buf++ = isc_dbp_code;
+	*buf++ = (char)s_len;
+	memcpy(buf, s, s_len);
+	return dbp;
+}
+
+static char* connection_create_dbp(VALUE self, int *length)
+{
+	char *dbp;
+	VALUE username, password, charset, role;
+	
+	username = rb_iv_get(self, "@username");
+	Check_Type(username, T_STRING);
+	password = rb_iv_get(self, "@password");
+	Check_Type(password, T_STRING);
+	role = rb_iv_get(self, "@role");
+	charset = rb_iv_get(self, "@charset");
+	
+	dbp = dbp_create(length);
+	dbp = dbp_add_string(dbp, isc_dpb_user_name, STR2CSTR(username), length);
+	dbp = dbp_add_string(dbp, isc_dpb_password, STR2CSTR(password), length);
+	if (!NIL_P(charset))
+		dbp = dbp_add_string(dbp, isc_dpb_lc_ctype, STR2CSTR(charset), length);
+	if (!NIL_P(role))
+		dbp = dbp_add_string(dbp, isc_dpb_sql_role_name, STR2CSTR(role), length);
+	return dbp;
+}
+
+static VALUE connection_create(isc_db_handle handle)
+{
+	struct IBconn *fb_connection;
+	VALUE connection = Data_Make_Struct(rb_cFbConnection, struct IBconn, conn_mark, conn_free, fb_connection);
+	fb_connection->db = handle;
+	transact = 0;
+	i_sqlda = sqlda_alloc(SQLDA_COLSINIT);
+	o_sqlda = sqlda_alloc(SQLDA_COLSINIT);
+	results = paramts = 0;
+	ressize = prmsize = 0;
+	fb_connection->curs = rb_ary_new();
+	db_num++;
+	fb_connection->next = ibconn_list;
+	ibconn_list = fb_connection;
+
+	{
+		unsigned short dialect = SQL_DIALECT_CURRENT;
+		unsigned short db_dialect = conn_db_SQL_Dialect(fb_connection);
+
+		if (db_dialect < dialect) {
+			dialect = db_dialect;
+			/* TODO: downgrade warning */
+		}
+
+		fb_connection->dialect = dialect;
+		fb_connection->db_dialect = db_dialect;
+	}
+	
+	return connection;
+}
+
 static char* CONNECTION_PARMS[6] = {
 	"database",
 	"username",
@@ -1712,13 +1787,6 @@ static void define_attrs(VALUE klass, char **attrs)
 	}
 }
 
-static VALUE database_allocate_instance(VALUE klass)
-{
-    NEWOBJ(obj, struct RObject);
-    OBJSETUP(obj, klass, T_OBJECT);
-    return (VALUE)obj;
-}
-
 static VALUE default_string(VALUE hash, char *key, char *def)
 {
 	ID id = rb_intern(key);
@@ -1736,14 +1804,23 @@ static VALUE default_int(VALUE hash, char *key, int def)
 	return NIL_P(val) ? INT2NUM(def) : val;
 }
 
+static VALUE database_allocate_instance(VALUE klass)
+{
+    NEWOBJ(obj, struct RObject);
+    OBJSETUP(obj, klass, T_OBJECT);
+    return (VALUE)obj;
+}
+
 static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 {
 	if (argc >= 1)
 	{
 		VALUE parms = argv[0];
-		rb_iv_set(self, "@database", rb_hash_aref(parms, ID2SYM(rb_intern("database"))));
-		rb_iv_set(self, "@username", rb_hash_aref(parms, ID2SYM(rb_intern("username"))));
-		rb_iv_set(self, "@password", rb_hash_aref(parms, ID2SYM(rb_intern("password"))));
+		VALUE database = rb_hash_aref(parms, ID2SYM(rb_intern("database")));
+		if (NIL_P(database)) rb_raise(rb_eFbError, "Database must be specified.");
+		rb_iv_set(self, "@database", database);
+		rb_iv_set(self, "@username", default_string(parms, "username", "sysdba"));
+		rb_iv_set(self, "@password", default_string(parms, "password", "masterkey"));
 		rb_iv_set(self, "@charset", default_string(parms, "charset", "NONE"));
 		rb_iv_set(self, "@role", rb_hash_aref(parms, ID2SYM(rb_intern("role"))));
 		rb_iv_set(self, "@page_size", default_int(parms, "page_size", 1024));
@@ -1772,7 +1849,6 @@ static VALUE database_create(VALUE self)
 	if (isc_dsql_execute_immediate(isc_status, &connection, &transaction, 0, sql, 3, NULL) != 0)
 	{
 		ib_error_check();
-		rb_raise(rb_eFbError, "Error creating database.");
 	}
 	if (connection)
 	{
@@ -1790,6 +1866,38 @@ static VALUE database_s_create(int argc, VALUE *argv, VALUE klass)
 	return database_create(obj);
 }
 
+static VALUE database_connect(VALUE self)
+{
+	char *dbp;
+	int length;
+	isc_db_handle handle = NULL;
+	VALUE database = rb_iv_get(self, "@database");
+	Check_Type(database, T_STRING);
+	puts("there 0");
+	dbp = connection_create_dbp(self, &length);
+	puts("there 1");
+	puts("there 2");
+	isc_attach_database(isc_status, 0, STR2CSTR(database), &handle, length, dbp);
+	puts("there 3");
+	free(dbp);
+	puts("there 4");
+	ib_error_check();
+	puts("there 5");
+	{
+		VALUE connection = connection_create(handle);
+		puts("there 6");
+		if (rb_block_given_p())
+		{
+			return rb_ensure(rb_yield,connection,ibconn_close,connection);
+			return Qnil;
+		}
+		else
+		{
+			return connection;
+		}
+	}
+}
+
 void Init_fb()
 {
 	rb_mFb = rb_define_module("Fb");
@@ -1801,12 +1909,13 @@ void Init_fb()
 	rb_define_attr(rb_cFbDatabase, "page_size", 1, 1);
     rb_define_method(rb_cFbDatabase, "create", database_create, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "create", database_s_create, -1);
+	rb_define_method(rb_cFbDatabase, "connect", database_connect, 0);
 
 	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
 	rb_define_singleton_method(rb_cFbConnection, "new", ibconn_s_new, -1);
 	rb_define_singleton_method(rb_cFbConnection, "open", ibconn_s_new, -1);
 	rb_define_singleton_method(rb_cFbConnection, "connect", ibconn_s_new, -1);
-    
+	define_attrs(rb_cFbConnection, CONNECTION_PARMS);
 	rb_define_method(rb_cFbConnection, "cursor", ibconn_cursor, 0);
 	rb_define_method(rb_cFbConnection, "execute", ibconn_execute, -1);
 	rb_define_method(rb_cFbConnection, "transaction", ib_transaction, -1);
