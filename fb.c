@@ -1898,6 +1898,13 @@ static VALUE database_connect(VALUE self)
 	}
 }
 
+static VALUE database_s_connect(int argc, VALUE *argv, VALUE klass)
+{
+	VALUE obj = database_allocate_instance(klass);
+	database_initialize(argc, argv, obj);
+	return database_connect(obj);
+}
+
 void Init_fb()
 {
 	rb_mFb = rb_define_module("Fb");
@@ -1910,6 +1917,7 @@ void Init_fb()
     rb_define_method(rb_cFbDatabase, "create", database_create, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "create", database_s_create, -1);
 	rb_define_method(rb_cFbDatabase, "connect", database_connect, 0);
+	rb_define_singleton_method(rb_cFbDatabase, "connect", database_s_connect, -1);
 
 	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
 	rb_define_singleton_method(rb_cFbConnection, "new", ibconn_s_new, -1);
