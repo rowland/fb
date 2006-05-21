@@ -148,16 +148,33 @@ static long calculate_buffsize(XSQLDA *sqlda)
 	return offset;
 }
 
+static VALUE fb_error_msg(long *isc_status)
+{
+	char msg[512];
+	VALUE result = rb_str_new(NULL, 0);
+	while (isc_interprete(msg, &isc_status))
+	{
+		result = rb_str_cat(result, msg, strlen(msg));
+		result = rb_str_cat(result, "\n", strlen("\n"));
+	}
+	return result;
+}
+
 static void fb_error_check(long *isc_status)
 {
 	short code = isc_sqlcode(isc_status);
 
 	if (code != 0) {
 		char buf[1024];
-		VALUE exc;
+		VALUE exc, msg, msg1, msg2;
 
 		isc_sql_interprete(code, buf, 1024);
-		exc = rb_exc_new2(rb_eFbError, buf);
+		msg1 = rb_str_new2(buf);
+		msg2 = fb_error_msg(isc_status);
+		msg = rb_str_cat(msg1, "\n", strlen("\n"));
+		msg = rb_str_concat(msg, msg2);
+		
+		exc = rb_exc_new3(rb_eFbError, msg);
 		rb_iv_set(exc, "error_code", INT2FIX(code));
 		rb_exc_raise(exc);
 	}
@@ -228,20 +245,21 @@ static void fb_connection_drop_cursors(struct FbConnection *fb_connection)
 
 static void fb_connection_remove(struct FbConnection *fb_connection)
 {
-	fb_connection->db = 0;
-	db_num--;
-	if (fb_connection_list == 0 || fb_connection_list == fb_connection) {
-		fb_connection_list = 0;
-	} else {
-		struct FbConnection *list = fb_connection_list;
-
-		while (list->next) {
-			if (list->next == fb_connection) {
-				list->next = fb_connection->next;
-				break;
+	if (fb_connection_list != NULL) {
+		if (fb_connection_list == fb_connection) {
+			fb_connection_list = fb_connection_list->next;
+		} else {
+			struct FbConnection *list = fb_connection_list;
+			while (list->next) {
+				if (list->next == fb_connection) {
+					list->next = fb_connection->next;
+					break;
+				}
+				list = list->next;
 			}
-			list = list->next;
 		}
+		fb_connection->db = 0;
+		db_num--;
 	}
 }
 
@@ -693,6 +711,11 @@ static VALUE global_transaction(int argc, VALUE *argv, VALUE self)
 	transaction_start(opt, argc, argv);
 
 	return Qnil;
+}
+
+static VALUE global_transaction_started()
+{
+	return transact ? Qtrue : Qfalse;
 }
 
 static VALUE global_commit()
@@ -1823,6 +1846,7 @@ static VALUE database_drop(VALUE self)
 	Data_Get_Struct(connection, struct FbConnection, fb_connection);
 	isc_drop_database(isc_status, &fb_connection->db);
 	fb_error_check(isc_status);
+	fb_connection_remove(fb_connection);
 	return Qnil;
 }
 
@@ -1850,9 +1874,10 @@ void Init_fb()
 	rb_define_singleton_method(rb_cFbDatabase, "drop", database_s_drop, -1);
 
 	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
-	rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0);
+	//rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0);
 	rb_define_method(rb_cFbConnection, "execute", connection_execute, -1);
 	rb_define_method(rb_cFbConnection, "transaction", global_transaction, -1);
+	rb_define_method(rb_cFbConnection, "transaction_started", global_transaction_started, 0);
 	rb_define_method(rb_cFbConnection, "commit", global_commit, 0);
 	rb_define_method(rb_cFbConnection, "rollback", global_rollback, 0);
 	rb_define_method(rb_cFbConnection, "close", connection_close, 0);
