@@ -74,19 +74,21 @@ typedef	struct
 	char  vary_string[1];
 } VARY;
 
-struct IBconn {
+struct FbConnection {
 	isc_db_handle db;		/* DB handle */
-	VALUE curs;
+	VALUE cursor;
 	unsigned short dialect;
 	unsigned short db_dialect;
-	struct IBconn *next;
-} *ibconn_list;
+	struct FbConnection *next;
+};
 
-struct IBcurs {
+static struct FbConnection *fb_connection_list;
+
+struct FbCursor {
 	int open;
 	isc_stmt_handle stmt;
 	VALUE describe;
-	VALUE conn;
+	VALUE connection;
 };
 
 typedef struct trans_opts
@@ -196,48 +198,48 @@ static void curs_mark();
 static void curs_free();
 
 /* connection utilities */
-static void conn_check(struct IBconn *conn)
+static void conn_check(struct FbConnection *fb_connection)
 {
-	if (conn->db == 0) {
+	if (fb_connection->db == 0) {
 		rb_raise(rb_eFbError, "closed db connection");
 	}
 }
 
 static void conn_close_cursors()
 {
-	struct IBconn *list = ibconn_list;
+	struct FbConnection *list = fb_connection_list;
 	int i;
 
 	while (list) {
-		for (i=0; i<RARRAY(list->curs)->len; i++) {
-			ibcurs_close(RARRAY(list->curs)->ptr[i]);
+		for (i=0; i<RARRAY(list->cursor)->len; i++) {
+			ibcurs_close(RARRAY(list->cursor)->ptr[i]);
 		}
 		list = list->next;
 	}
 }
 
-static void conn_drop_cursors(struct IBconn *conn)
+static void conn_drop_cursors(struct FbConnection *fb_connection)
 {
 	int i;
 
-	for (i=0; i<RARRAY(conn->curs)->len; i++) {
-		ibcurs_drop(RARRAY(conn->curs)->ptr[i]);
+	for (i=0; i<RARRAY(fb_connection->cursor)->len; i++) {
+		ibcurs_drop(RARRAY(fb_connection->cursor)->ptr[i]);
 	}
-	RARRAY(conn->curs)->len = 0;
+	RARRAY(fb_connection->cursor)->len = 0;
 }
 
-static void conn_remove(struct IBconn *conn)
+static void conn_remove(struct FbConnection *fb_connection)
 {
-	conn->db = 0;
+	fb_connection->db = 0;
 	db_num--;
-	if (ibconn_list == 0 || ibconn_list == conn)
-		ibconn_list = 0;
+	if (fb_connection_list == 0 || fb_connection_list == fb_connection)
+		fb_connection_list = 0;
 	else {
-		struct IBconn *list = ibconn_list;
+		struct FbConnection *list = fb_connection_list;
 
 		while (list->next) {
-			if (list->next == conn) {
-				list->next = conn->next;
+			if (list->next == fb_connection) {
+				list->next = fb_connection->next;
 				break;
 			}
 			list = list->next;
@@ -245,58 +247,58 @@ static void conn_remove(struct IBconn *conn)
 	}
 }
 
-static void conn_disconnect(struct IBconn *conn)
+static void conn_disconnect(struct FbConnection *fb_connection)
 {
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
 		ib_error_check();
 	}
-	isc_detach_database(isc_status, &conn->db);
+	isc_detach_database(isc_status, &fb_connection->db);
 	ib_error_check();
-	conn_remove(conn);
+	conn_remove(fb_connection);
 }
 
-static void conn_disconnect_warn(struct IBconn *conn)
+static void conn_disconnect_warn(struct FbConnection *fb_connection)
 {
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
 		ib_error_check_warn();
 	}
-	isc_detach_database(isc_status, &conn->db);
+	isc_detach_database(isc_status, &fb_connection->db);
 	ib_error_check_warn();
-	conn_remove(conn);
+	conn_remove(fb_connection);
 }
 
-static void conn_mark(struct IBconn *conn)
+static void conn_mark(struct FbConnection *fb_connection)
 {
-	rb_gc_mark(conn->curs);
+	rb_gc_mark(fb_connection->cursor);
 }
 
-static void conn_free(struct IBconn *conn)
+static void conn_free(struct FbConnection *fb_connection)
 {
-	if (conn->db) {
-		conn_disconnect_warn(conn);
+	if (fb_connection->db) {
+		conn_disconnect_warn(fb_connection);
 	}
-	free(conn);
+	free(fb_connection);
 }
 
-static struct IBconn* conn_check_retrieve(VALUE data)
+static struct FbConnection* conn_check_retrieve(VALUE data)
 {
 	if (TYPE(data) != T_DATA || RDATA(data)->dfree != (void *)conn_free) {
 		rb_raise(rb_eTypeError, "wrong argument type %s (expected InterBase::Connection)",
 			rb_class2name(CLASS_OF(data)));
 	}
-	return (struct IBconn*)RDATA(data)->data;
+	return (struct FbConnection*)RDATA(data)->data;
 }
 
-static unsigned short conn_db_SQL_Dialect(struct IBconn *conn)
+static unsigned short conn_db_SQL_Dialect(struct FbConnection *fb_connection)
 {
 	long dialect;
 	long length;
 	char db_info_command = isc_info_db_SQL_dialect;
 
 	/* Get the db SQL Dialect */
-	isc_database_info(isc_status, &conn->db,
+	isc_database_info(isc_status, &fb_connection->db,
 			1, &db_info_command,
 			sizeof(isc_info_buff), isc_info_buff);
 	ib_error_check();
@@ -311,14 +313,14 @@ static unsigned short conn_db_SQL_Dialect(struct IBconn *conn)
 	return dialect;
 }
 
-static unsigned short conn_dialect(struct IBconn *conn)
+static unsigned short conn_dialect(struct FbConnection *fb_connection)
 {
-	return conn->dialect;
+	return fb_connection->dialect;
 }
 
-static unsigned short conn_db_dialect(struct IBconn *conn)
+static unsigned short conn_db_dialect(struct FbConnection *fb_connection)
 {
-	return conn->db_dialect;
+	return fb_connection->db_dialect;
 }
 
 /* Transaction option list */
@@ -633,9 +635,9 @@ error:
 	rb_raise(rb_eFbError, desc);
 }
 
-static void set_teb_vec(ISC_TEB *vec, struct IBconn *conn, char *tpb, int len)
+static void set_teb_vec(ISC_TEB *vec, struct FbConnection *fb_connection, char *tpb, int len)
 {
-	vec->dbb_ptr = &conn->db;
+	vec->dbb_ptr = &fb_connection->db;
 	if (tpb) {
 		vec->tpb_ptr = tpb;
 		vec->tpb_len = len;
@@ -648,7 +650,7 @@ static void set_teb_vec(ISC_TEB *vec, struct IBconn *conn, char *tpb, int len)
 
 static void trans_start(VALUE opt, int argc, VALUE *argv)
 {
-	struct IBconn *conn;
+	struct FbConnection *fb_connection;
 	ISC_TEB *teb_vec = ALLOCA_N(ISC_TEB, db_num);
 	ISC_TEB *vec = teb_vec;
 	char *tpb = 0;
@@ -668,15 +670,15 @@ static void trans_start(VALUE opt, int argc, VALUE *argv)
 	}
 	if (argc == 0) {
 		n = db_num;
-		for (conn=ibconn_list; conn; conn=conn->next) {
-			set_teb_vec(vec, conn, tpb, tpb_len);
+		for (fb_connection=fb_connection_list; fb_connection; fb_connection=fb_connection->next) {
+			set_teb_vec(vec, fb_connection, tpb, tpb_len);
 			vec++;
 		}
 	}
 	else {
 		for (n=0; n<argc; n++) {
-			conn = conn_check_retrieve(argv[n]);
-			set_teb_vec(vec, conn, tpb, tpb_len);
+			fb_connection = conn_check_retrieve(argv[n]);
+			set_teb_vec(vec, fb_connection, tpb, tpb_len);
 			vec++;
 		}
 	}
@@ -731,7 +733,7 @@ static VALUE ibconn_s_new(int argc, VALUE *argv, VALUE klass)
 {
 	VALUE a, b, c, d, obj;
 	char *db, *user, *pass, *charset;
-	struct IBconn *conn;
+	struct FbConnection *fb_connection;
 	isc_db_handle handle = 0;		/* database handle */
 	char *isc_p;
 	short isc_l = 0;
@@ -752,29 +754,29 @@ static VALUE ibconn_s_new(int argc, VALUE *argv, VALUE klass)
 	isc_free(isc_p);
 	ib_error_check();
 
-	obj = Data_Make_Struct(klass, struct IBconn, conn_mark, conn_free, conn);
-	conn->db = handle;
+	obj = Data_Make_Struct(klass, struct FbConnection, conn_mark, conn_free, fb_connection);
+	fb_connection->db = handle;
 	transact = 0;
 	i_sqlda = sqlda_alloc(SQLDA_COLSINIT);
 	o_sqlda = sqlda_alloc(SQLDA_COLSINIT);
 	results = paramts = 0;
 	ressize = prmsize = 0;
-	conn->curs = rb_ary_new();
+	fb_connection->cursor = rb_ary_new();
 	db_num++;
-	conn->next = ibconn_list;
-	ibconn_list = conn;
+	fb_connection->next = fb_connection_list;
+	fb_connection_list = fb_connection;
 
 	{
 		unsigned short dialect = SQL_DIALECT_CURRENT;
-		unsigned short db_dialect = conn_db_SQL_Dialect(conn);
+		unsigned short db_dialect = conn_db_SQL_Dialect(fb_connection);
 
 		if (db_dialect < dialect) {
 			dialect = db_dialect;
 			/* TODO: downgrade warning */
 		}
 
-		conn->dialect = dialect;
-		conn->db_dialect = db_dialect;
+		fb_connection->dialect = dialect;
+		fb_connection->db_dialect = db_dialect;
 	}
 
 	if (rb_block_given_p()) {
@@ -788,18 +790,18 @@ static VALUE ibconn_s_new(int argc, VALUE *argv, VALUE klass)
 static VALUE ibconn_cursor(VALUE obj)
 {
 	VALUE c;
-	struct IBconn *conn;
-	struct IBcurs *curs;
+	struct FbConnection *fb_connection;
+	struct FbCursor *fb_cursor;
 
-	Data_Get_Struct(obj, struct IBconn, conn);
-	conn_check(conn);
+	Data_Get_Struct(obj, struct FbConnection, fb_connection);
+	conn_check(fb_connection);
 
-	c = Data_Make_Struct(rb_cFbCursor, struct IBcurs, curs_mark, curs_free, curs);
-	curs->conn = obj;
-	curs->describe = Qnil;
-	curs->open = Qfalse;
-	curs->stmt = 0;
-	isc_dsql_alloc_statement2(isc_status, &conn->db, &curs->stmt);
+	c = Data_Make_Struct(rb_cFbCursor, struct FbCursor, curs_mark, curs_free, fb_cursor);
+	fb_cursor->connection = obj;
+	fb_cursor->describe = Qnil;
+	fb_cursor->open = Qfalse;
+	fb_cursor->stmt = 0;
+	isc_dsql_alloc_statement2(isc_status, &fb_connection->db, &fb_cursor->stmt);
 	ib_error_check();
 
 	return c;
@@ -807,16 +809,16 @@ static VALUE ibconn_cursor(VALUE obj)
 
 static VALUE ibconn_execute(int argc, VALUE *argv, VALUE obj)
 {
-	VALUE curs = ibconn_cursor(obj);
+	VALUE cursor = ibconn_cursor(obj);
 	VALUE val;
 
-	val = ibcurs_execute(argc, argv, curs);
+	val = ibcurs_execute(argc, argv, cursor);
 	if (NIL_P(val)) {
 		if (rb_block_given_p()) {
-			return rb_ensure(rb_yield,curs,ibcurs_close,curs);
+			return rb_ensure(rb_yield,cursor,ibcurs_close,cursor);
    		}
 		else {
-			return curs;
+			return cursor;
    		}
 	}
 	return Qnil;
@@ -824,80 +826,80 @@ static VALUE ibconn_execute(int argc, VALUE *argv, VALUE obj)
 
 static VALUE ibconn_close(VALUE self)
 {
-	struct IBconn *conn;
+	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(self, struct IBconn, conn);
-	conn_check(conn);
-	conn_disconnect(conn);
-	conn_drop_cursors(conn);
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	conn_check(fb_connection);
+	conn_disconnect(fb_connection);
+	conn_drop_cursors(fb_connection);
 
 	return Qnil;
 }
 
 static VALUE ibconn_dialect(VALUE self)
 {
-	struct IBconn *conn;
+	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(self, struct IBconn, conn);
-	conn_check(conn);
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	conn_check(fb_connection);
 	
-	return INT2FIX(conn->dialect);
+	return INT2FIX(fb_connection->dialect);
 }
 
 static VALUE ibconn_db_dialect(VALUE self)
 {
-	struct IBconn *conn;
+	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(self, struct IBconn, conn);
-	conn_check(conn);
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	conn_check(fb_connection);
 	
-	return INT2FIX(conn->db_dialect);
+	return INT2FIX(fb_connection->db_dialect);
 }
 
 /* cursor utilities */
-static void curs_check(struct IBcurs *curs)
+static void curs_check(struct FbCursor *fb_cursor)
 {
-	if (curs->stmt == 0) {
+	if (fb_cursor->stmt == 0) {
 		rb_raise(rb_eFbError, "dropped db cursor");
 	}
-	if (!curs->open) {
+	if (!fb_cursor->open) {
 		rb_raise(rb_eFbError, "closed db cursor");
 	}
 }
 
-static void curs_drop(struct IBcurs *curs)
+static void curs_drop(struct FbCursor *fb_cursor)
 {
-	if (curs->open) {
-		isc_dsql_free_statement(isc_status, &curs->stmt, DSQL_close);
+	if (fb_cursor->open) {
+		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
 		ib_error_check();
 	}
-	isc_dsql_free_statement(isc_status, &curs->stmt, DSQL_drop);
+	isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_drop);
 	ib_error_check();
-	curs->stmt = 0;
+	fb_cursor->stmt = 0;
 }
 
-static void curs_drop_warn(struct IBcurs *curs)
+static void curs_drop_warn(struct FbCursor *fb_cursor)
 {
-	if (curs->open) {
-		isc_dsql_free_statement(isc_status, &curs->stmt, DSQL_close);
+	if (fb_cursor->open) {
+		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
 		ib_error_check_warn();
 	}
-	isc_dsql_free_statement(isc_status, &curs->stmt, DSQL_drop);
+	isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_drop);
 	ib_error_check_warn();
-	curs->stmt = 0;
+	fb_cursor->stmt = 0;
 }
 
-static void curs_mark(struct IBcurs *curs)
+static void curs_mark(struct FbCursor *fb_cursor)
 {
-	rb_gc_mark(curs->conn);
-	rb_gc_mark(curs->describe);
+	rb_gc_mark(fb_cursor->connection);
+	rb_gc_mark(fb_cursor->describe);
 }
 
-static void curs_free(struct IBcurs *curs)
+static void curs_free(struct FbCursor *fb_cursor)
 {
-	if (curs->stmt)
-		curs_drop_warn(curs);
-	free(curs);
+	if (fb_cursor->stmt)
+		curs_drop_warn(fb_cursor);
+	free(fb_cursor);
 }
 
 struct time_object {
@@ -910,9 +912,9 @@ struct time_object {
 #define GetTimeval(obj, tobj) \
     Data_Get_Struct(obj, struct time_object, tobj)
 
-static void set_inputparams(struct IBcurs *curs, int argc, VALUE *argv)
+static void set_inputparams(struct FbCursor *fb_cursor, int argc, VALUE *argv)
 {
-	struct IBconn *conn;
+	struct FbConnection *fb_connection;
 	long count;
 	long offset;
 	long type;
@@ -933,7 +935,7 @@ static void set_inputparams(struct IBcurs *curs, int argc, VALUE *argv)
 	unsigned short length;
 	struct time_object *tobj;
 
-	Data_Get_Struct(curs->conn, struct IBconn, conn);
+	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 
 	/* Check the number of parameters */
 	if (i_sqlda->sqld != argc) {
@@ -1032,7 +1034,7 @@ static void set_inputparams(struct IBcurs *curs, int argc, VALUE *argv)
 
 					blob_handle = NULL;
 					isc_create_blob2(
-						isc_status,&conn->db,&transact,
+						isc_status,&fb_connection->db,&transact,
 						&blob_handle,&blob_id,0,NULL);
 					ib_error_check();
 					length = RSTRING(obj)->len;
@@ -1116,11 +1118,11 @@ static void set_inputparams(struct IBcurs *curs, int argc, VALUE *argv)
 	}
 }
 
-static void execute_withparams(struct IBcurs *curs, int argc, VALUE *argv)
+static void execute_withparams(struct FbCursor *fb_cursor, int argc, VALUE *argv)
 {
-	struct IBconn *conn;
+	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(curs->conn, struct IBconn, conn);
+	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 	/* Check the first object type of the parameters */
 	if (argc >= 1 && TYPE(argv[0]) == T_ARRAY) {
 		VALUE obj;
@@ -1131,19 +1133,19 @@ static void execute_withparams(struct IBcurs *curs, int argc, VALUE *argv)
 
 			/* Set the input parameters */
 			Check_Type(obj, T_ARRAY);
-			set_inputparams(curs, RARRAY(obj)->len, RARRAY(obj)->ptr);
+			set_inputparams(fb_cursor, RARRAY(obj)->len, RARRAY(obj)->ptr);
 
 			/* Execute SQL statement */
-			isc_dsql_execute2(isc_status, &transact, &curs->stmt, 1, i_sqlda, 0);
+			isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, 1, i_sqlda, 0);
 			ib_error_check();
 		}
 	}
 	else {
 		/* Set the input parameters */
-		set_inputparams(curs, argc, argv);
+		set_inputparams(fb_cursor, argc, argv);
 
 		/* Execute SQL statement */
-		isc_dsql_execute2(isc_status, &transact, &curs->stmt, 1, i_sqlda, 0);
+		isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, 1, i_sqlda, 0);
 		ib_error_check();
 	}
 }
@@ -1207,7 +1209,7 @@ static VALUE curs_description(XSQLDA *sqlda)
 }
 
 /* Check the input parameters */
-static void curs_check_inparams(struct IBcurs *curs, int argc, VALUE *argv, int exec)
+static void curs_check_inparams(struct FbCursor *fb_cursor, int argc, VALUE *argv, int exec)
 {
 	long items;
 
@@ -1219,10 +1221,10 @@ static void curs_check_inparams(struct IBcurs *curs, int argc, VALUE *argv, int 
 	/* Execute specified process */
 	switch (exec) {
 		case EXECF_EXECDML:
-			execute_withparams(curs, argc, argv);
+			execute_withparams(fb_cursor, argc, argv);
 			break;
 		case EXECF_SETPARM:
-			set_inputparams(curs, argc, argv);
+			set_inputparams(fb_cursor, argc, argv);
 			break;
 		default:
 			rb_raise(rb_eFbError, "should specify either EXECF_EXECDML or EXECF_SETPARM");
@@ -1230,9 +1232,9 @@ static void curs_check_inparams(struct IBcurs *curs, int argc, VALUE *argv, int 
 	}
 }
 
-static void curs_fetch_prep(struct IBcurs *curs)
+static void curs_fetch_prep(struct FbCursor *fb_cursor)
 {
-	struct IBconn *conn;
+	struct FbConnection *fb_connection;
 	long cols;
 	long count;
 	XSQLVAR *var;
@@ -1241,17 +1243,17 @@ static void curs_fetch_prep(struct IBcurs *curs)
 	long alignment;
 	long offset;
 
-	curs_check(curs);
+	curs_check(fb_cursor);
 
-	Data_Get_Struct(curs->conn, struct IBconn, conn);
-	conn_check(conn);
+	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	conn_check(fb_connection);
 
 	/* Check if open cursor */
-	if (!curs->open) {
+	if (!fb_cursor->open) {
 		rb_raise(rb_eFbError, "The cursor has not been open; use execute(query)");
 	}
 	/* Describe output SQLDA */
-	isc_dsql_describe(isc_status, &curs->stmt, 1, o_sqlda);
+	isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, o_sqlda);
 	ib_error_check();
 
 	/* Set the output SQLDA */
@@ -1275,9 +1277,9 @@ static void curs_fetch_prep(struct IBcurs *curs)
 	}
 }
 
-static VALUE curs_fetch(struct IBcurs *curs)
+static VALUE curs_fetch(struct FbCursor *fb_cursor)
 {
-	struct IBconn *conn;
+	struct FbConnection *fb_connection;
 	long cols;
 	VALUE ary;
 	long count;
@@ -1306,11 +1308,11 @@ static VALUE curs_fetch(struct IBcurs *curs)
 	ISC_LONG num_segments;
 	ISC_LONG total_length;
 
-	Data_Get_Struct(curs->conn, struct IBconn, conn);
-	conn_check(conn);
+	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	conn_check(fb_connection);
 
 	/* Fetch one row */
-	if (isc_dsql_fetch(isc_status, &curs->stmt, 1, o_sqlda) == SQLCODE_NOMORE) {
+	if (isc_dsql_fetch(isc_status, &fb_cursor->stmt, 1, o_sqlda) == SQLCODE_NOMORE) {
 		return Qnil;
 	}
 	ib_error_check();
@@ -1404,7 +1406,7 @@ static VALUE curs_fetch(struct IBcurs *curs)
 				case SQL_BLOB:
 					blob_handle = NULL;
 					blob_id = *(ISC_QUAD *)var->sqldata;
-					isc_open_blob2(isc_status,&conn->db,&transact,&blob_handle,&blob_id,0,NULL);
+					isc_open_blob2(isc_status,&fb_connection->db,&transact,&blob_handle,&blob_id,0,NULL);
 					ib_error_check();
 					isc_blob_info(
 						isc_status, &blob_handle,
@@ -1455,8 +1457,8 @@ static VALUE curs_fetch(struct IBcurs *curs)
 /* cursor methods */
 static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 {
-	struct IBcurs *curs;
-	struct IBconn *conn;
+	struct FbCursor *fb_cursor;
+	struct FbConnection *fb_connection;
 	char *sql;
 	long statement;
 	long length;
@@ -1464,10 +1466,10 @@ static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 	long cols;
 	long items;
 
-	Data_Get_Struct(self, struct IBcurs, curs);
+	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 
-	Data_Get_Struct(curs->conn, struct IBconn, conn);
-	conn_check(conn);
+	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	conn_check(fb_connection);
 
 	if (argc < 1) {
 		rb_raise(rb_eArgError, "too few arguments (at least 1)");
@@ -1475,19 +1477,19 @@ static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 	sql = STR2CSTR(*argv);
 	argc--; argv++;
 
-	if (curs->open) {
-		isc_dsql_free_statement(isc_status, &curs->stmt, DSQL_close);
+	if (fb_cursor->open) {
+		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
 		ib_error_check();
-		curs->open = Qfalse;
+		fb_cursor->open = Qfalse;
 	}
 	if (!transact) trans_start(Qnil, 0, 0);
 
 	/* Prepare query */
-	isc_dsql_prepare(isc_status, &transact, &curs->stmt, 0, sql, conn_dialect(conn), o_sqlda);
+	isc_dsql_prepare(isc_status, &transact, &fb_cursor->stmt, 0, sql, conn_dialect(fb_connection), o_sqlda);
 	ib_error_check();
 
 	/* Get the statement type */
-	isc_dsql_sql_info(isc_status, &curs->stmt,
+	isc_dsql_sql_info(isc_status, &fb_cursor->stmt,
 			sizeof(isc_info_stmt), isc_info_stmt,
 			sizeof(isc_info_buff), isc_info_buff);
 	ib_error_check();
@@ -1500,10 +1502,10 @@ static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 		statement = 0;
 
 	/* Describe the parameters */
-	isc_dsql_describe_bind(isc_status, &curs->stmt, 1, i_sqlda);
+	isc_dsql_describe_bind(isc_status, &fb_cursor->stmt, 1, i_sqlda);
 	ib_error_check();
 
-	isc_dsql_describe(isc_status, &curs->stmt, 1, o_sqlda);
+	isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, o_sqlda);
 	ib_error_check();
 
 	/* Get the number of parameters and reallocate the SQLDA */
@@ -1512,7 +1514,7 @@ static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 		free(i_sqlda);
 		i_sqlda = sqlda_alloc(in_params);
 		/* Describe again */
-		isc_dsql_describe_bind(isc_status, &curs->stmt, 1, i_sqlda);
+		isc_dsql_describe_bind(isc_status, &fb_cursor->stmt, 1, i_sqlda);
 		ib_error_check();
 	}
 
@@ -1537,10 +1539,10 @@ static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 			rb_raise(rb_eFbError, "use InterBase::Connection#rollback()");
 		}
 		else if (in_params) {
-			curs_check_inparams(curs, argc, argv, EXECF_EXECDML);
+			curs_check_inparams(fb_cursor, argc, argv, EXECF_EXECDML);
 		}
 		else {
-			isc_dsql_execute2(isc_status, &transact, &curs->stmt, 1, 0, 0);
+			isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, 1, 0, 0);
 			ib_error_check();
 		}
 	}
@@ -1552,26 +1554,26 @@ static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 			free(o_sqlda);
 			o_sqlda = sqlda_alloc(cols);
 			/* Describe again */
-			isc_dsql_describe(isc_status, &curs->stmt, 1, o_sqlda);
+			isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, o_sqlda);
 			ib_error_check();
 		}
 
 		if (in_params) {
-			curs_check_inparams(curs, argc, argv, EXECF_SETPARM);
+			curs_check_inparams(fb_cursor, argc, argv, EXECF_SETPARM);
 		}
 
 #if 0
 		/* Declare cursor */
-		isc_dsql_set_cursor_name(isc_status, &curs->stmt, self->curs_name, 0);
+		isc_dsql_set_cursor_name(isc_status, &fb_cursor->stmt, self->curs_name, 0);
 		ib_error_check();
 #endif
 
 		/* Open cursor */
 		isc_dsql_execute2(isc_status, &transact,
-				&curs->stmt, 1,
+				&fb_cursor->stmt, 1,
 				in_params?i_sqlda:0, 0);
 		ib_error_check();
-		curs->open = Qtrue;
+		fb_cursor->open = Qtrue;
 
 		/* Get the size of results buffer and reallocate it */
 		length = calculate_buffsize(o_sqlda);
@@ -1581,7 +1583,7 @@ static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 		}
 
 		/* Set the description attributes */
-		curs->describe = curs_description(o_sqlda);
+		fb_cursor->describe = curs_description(o_sqlda);
 	}
 	/* Set the return object */
 	if (statement == isc_info_sql_stmt_select ||
@@ -1596,25 +1598,25 @@ static VALUE ibcurs_execute(int argc, VALUE* argv, VALUE self)
 
 static VALUE ibcurs_fetch(VALUE self)
 {
-	struct IBcurs *curs;
+	struct FbCursor *fb_cursor;
 
-	Data_Get_Struct(self, struct IBcurs, curs);
-	curs_fetch_prep(curs);
+	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	curs_fetch_prep(fb_cursor);
 
-	return curs_fetch(curs);
+	return curs_fetch(fb_cursor);
 }
 
 static VALUE ibcurs_fetchall(VALUE self)
 {
 	VALUE ary, row;
-	struct IBcurs *curs;
+	struct FbCursor *fb_cursor;
 
-	Data_Get_Struct(self, struct IBcurs, curs);
-	curs_fetch_prep(curs);
+	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	curs_fetch_prep(fb_cursor);
 
 	ary = rb_ary_new();
 	for (;;) {
-		row = curs_fetch(curs);
+		row = curs_fetch(fb_cursor);
 		if (NIL_P(row)) break;
 		rb_ary_push(ary, row);
 	}
@@ -1625,13 +1627,13 @@ static VALUE ibcurs_fetchall(VALUE self)
 static VALUE ibcurs_each(VALUE self)
 {
 	VALUE ary, row;
-	struct IBcurs *curs;
+	struct FbCursor *fb_cursor;
 
-	Data_Get_Struct(self, struct IBcurs, curs);
-	curs_fetch_prep(curs);
+	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	curs_fetch_prep(fb_cursor);
 
 	for (;;) {
-		row = curs_fetch(curs);
+		row = curs_fetch(fb_cursor);
 		if (NIL_P(row)) break;
 		rb_yield(row);
 	}
@@ -1641,18 +1643,18 @@ static VALUE ibcurs_each(VALUE self)
 
 static VALUE ibcurs_close(VALUE self)
 {
-	struct IBcurs *curs;
+	struct FbCursor *fb_cursor;
 
-	Data_Get_Struct(self, struct IBcurs, curs);
-	curs_check(curs);
+	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	curs_check(fb_cursor);
 
 	/* Close the cursor */
-	if (curs->stmt) {
-		isc_dsql_free_statement(isc_status, &curs->stmt, DSQL_close);
+	if (fb_cursor->stmt) {
+		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
 		ib_error_check();
-		curs->open = Qfalse;
+		fb_cursor->open = Qfalse;
 	}
-	curs->describe = Qnil;
+	fb_cursor->describe = Qnil;
 
 	return Qnil;
 }
@@ -1660,19 +1662,19 @@ static VALUE ibcurs_close(VALUE self)
 
 static VALUE ibcurs_drop(VALUE self)
 {
-	struct IBcurs *curs;
-	struct IBconn *conn;
+	struct FbCursor *fb_cursor;
+	struct FbConnection *fb_connection;
 	int i;
 
-	Data_Get_Struct(self, struct IBcurs, curs);
-	curs_drop(curs);
-	curs->describe = Qnil;
+	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	curs_drop(fb_cursor);
+	fb_cursor->describe = Qnil;
 
 	/* reset the reference from connection */
-	Data_Get_Struct(curs->conn, struct IBconn, conn);
-	for (i=0; i<RARRAY(conn->curs)->len; i++) {
-		if (RARRAY(conn->curs)->ptr[i] == self) {
-			RARRAY(conn->curs)->ptr[i] = Qnil;
+	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	for (i=0; i<RARRAY(fb_connection->cursor)->len; i++) {
+		if (RARRAY(fb_connection->cursor)->ptr[i] == self) {
+			RARRAY(fb_connection->cursor)->ptr[i] = Qnil;
 		}
 	}
 
@@ -1681,10 +1683,10 @@ static VALUE ibcurs_drop(VALUE self)
 
 static VALUE ibcurs_description(VALUE self)
 {
-	struct IBcurs *curs;
+	struct FbCursor *fb_cursor;
 
-	Data_Get_Struct(self, struct IBcurs, curs);
-	return curs->describe;
+	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	return fb_cursor->describe;
 }
 
 static VALUE iberr_err_code(VALUE err)
@@ -1739,18 +1741,18 @@ static char* connection_create_dbp(VALUE self, int *length)
 
 static VALUE connection_create(isc_db_handle handle)
 {
-	struct IBconn *fb_connection;
-	VALUE connection = Data_Make_Struct(rb_cFbConnection, struct IBconn, conn_mark, conn_free, fb_connection);
+	struct FbConnection *fb_connection;
+	VALUE connection = Data_Make_Struct(rb_cFbConnection, struct FbConnection, conn_mark, conn_free, fb_connection);
 	fb_connection->db = handle;
 	transact = 0;
 	i_sqlda = sqlda_alloc(SQLDA_COLSINIT);
 	o_sqlda = sqlda_alloc(SQLDA_COLSINIT);
 	results = paramts = 0;
 	ressize = prmsize = 0;
-	fb_connection->curs = rb_ary_new();
+	fb_connection->cursor = rb_ary_new();
 	db_num++;
-	fb_connection->next = ibconn_list;
-	ibconn_list = fb_connection;
+	fb_connection->next = fb_connection_list;
+	fb_connection_list = fb_connection;
 
 	{
 		unsigned short dialect = SQL_DIALECT_CURRENT;
@@ -1887,7 +1889,6 @@ static VALUE database_connect(VALUE self)
 	ib_error_check();
 	{
 		VALUE connection = connection_create(handle);
-		puts("there 6");
 		if (rb_block_given_p())
 		{
 			return rb_ensure(rb_yield,connection,ibconn_close,connection);
@@ -1907,6 +1908,24 @@ static VALUE database_s_connect(int argc, VALUE *argv, VALUE klass)
 	return database_connect(obj);
 }
 
+static VALUE database_drop(VALUE self)
+{
+	struct FbConnection *fb_connection;
+	
+	VALUE connection = database_connect(self);
+	Data_Get_Struct(connection, struct FbConnection, fb_connection);
+	isc_drop_database(isc_status, &fb_connection->db);
+	ib_error_check();
+	return Qnil;
+}
+
+static VALUE database_s_drop(int argc, VALUE *argv, VALUE klass)
+{
+	VALUE obj = database_allocate_instance(klass);
+	database_initialize(argc, argv, obj);
+	return database_drop(obj);
+}
+
 void Init_fb()
 {
 	rb_mFb = rb_define_module("Fb");
@@ -1920,11 +1939,13 @@ void Init_fb()
 	rb_define_singleton_method(rb_cFbDatabase, "create", database_s_create, -1);
 	rb_define_method(rb_cFbDatabase, "connect", database_connect, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "connect", database_s_connect, -1);
+	rb_define_method(rb_cFbDatabase, "drop", database_drop, 0);
+	rb_define_singleton_method(rb_cFbDatabase, "drop", database_s_drop, -1);
 
 	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
-	rb_define_singleton_method(rb_cFbConnection, "new", ibconn_s_new, -1);
-	rb_define_singleton_method(rb_cFbConnection, "open", ibconn_s_new, -1);
-	rb_define_singleton_method(rb_cFbConnection, "connect", ibconn_s_new, -1);
+	//rb_define_singleton_method(rb_cFbConnection, "new", ibconn_s_new, -1);
+	//rb_define_singleton_method(rb_cFbConnection, "open", ibconn_s_new, -1);
+	//rb_define_singleton_method(rb_cFbConnection, "connect", ibconn_s_new, -1);
 	//define_attrs(rb_cFbConnection, CONNECTION_PARMS);
 	rb_define_method(rb_cFbConnection, "cursor", ibconn_cursor, 0);
 	rb_define_method(rb_cFbConnection, "execute", ibconn_execute, -1);
