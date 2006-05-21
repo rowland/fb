@@ -79,6 +79,7 @@ struct FbConnection {
 	VALUE cursor;
 	unsigned short dialect;
 	unsigned short db_dialect;
+	int dropped;
 	struct FbConnection *next;
 };
 
@@ -269,7 +270,11 @@ static void fb_connection_disconnect(struct FbConnection *fb_connection)
 		isc_commit_transaction(isc_status, &transact);
 		fb_error_check(isc_status);
 	}
-	isc_detach_database(isc_status, &fb_connection->db);
+	if (fb_connection->dropped) {
+		isc_drop_database(isc_status, &fb_connection->db);
+	} else {
+		isc_detach_database(isc_status, &fb_connection->db);
+	}
 	fb_error_check(isc_status);
 	fb_connection_remove(fb_connection);
 }
@@ -799,7 +804,22 @@ static VALUE connection_close(VALUE self)
 	struct FbConnection *fb_connection;
 
 	Data_Get_Struct(self, struct FbConnection, fb_connection);
+
+	if (fb_connection->dropped) return Qnil;
+
 	fb_connection_check(fb_connection);
+	fb_connection_disconnect(fb_connection);
+	fb_connection_drop_cursors(fb_connection);
+
+	return Qnil;
+}
+
+static VALUE connection_drop(VALUE self)
+{
+	struct FbConnection *fb_connection;
+
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	fb_connection->dropped = 1;
 	fb_connection_disconnect(fb_connection);
 	fb_connection_drop_cursors(fb_connection);
 
@@ -1903,6 +1923,7 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "commit", global_commit, 0);
 	rb_define_method(rb_cFbConnection, "rollback", global_rollback, 0);
 	rb_define_method(rb_cFbConnection, "close", connection_close, 0);
+	rb_define_method(rb_cFbConnection, "drop", connection_drop, 0);
 	rb_define_method(rb_cFbConnection, "open?", connection_is_open, 0);
 	rb_define_method(rb_cFbConnection, "dialect", connection_dialect, 0);
 	rb_define_method(rb_cFbConnection, "db_dialect", connection_db_dialect, 0);

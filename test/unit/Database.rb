@@ -13,6 +13,7 @@ class DatabaseTestCases < Test::Unit::TestCase
       :password => 'masterkey',
       :charset => 'NONE',
       :role => 'READER' }
+    rm_rf @db_file
   end
   
   def test_new
@@ -53,14 +54,12 @@ class DatabaseTestCases < Test::Unit::TestCase
   end
   
   def test_create_instance
-    rm_rf @db_file
     db = Database.new(@parms)
     db.create
     assert File.exists?(@db_file)
   end
   
   def test_create_instance_block
-    rm_rf @db_file
     db = Database.new(@parms)
     db.create do |connection|
       connection.execute("select * from RDB$DATABASE") do |cursor|
@@ -74,19 +73,16 @@ class DatabaseTestCases < Test::Unit::TestCase
   end
   
   def test_create_singleton
-    rm_rf @db_file
     db = Database.create(@parms);
     assert File.exists?(@db_file)
   end
 
   def test_create_singleton_with_defaults
-    rm_rf @db_file
     db = Database.create(:database => "localhost:#{@db_file}");
     assert File.exists?(@db_file)
   end
 
   def test_create_singleton_block
-    rm_rf @db_file
     db = Database.create(@parms) do |connection|
       connection.execute("select * from RDB$DATABASE") do |cursor|
         row = cursor.fetch
@@ -98,7 +94,6 @@ class DatabaseTestCases < Test::Unit::TestCase
   end
 
   def test_connect_instance
-    rm_rf @db_file
     db = Database.create(@parms)
     connection = db.connect
     assert_instance_of Connection, connection
@@ -106,7 +101,6 @@ class DatabaseTestCases < Test::Unit::TestCase
   end
 
   def test_connect_singleton
-    rm_rf @db_file
     db = Database.create(@parms)
     connection = Database.connect(@parms)
     assert_instance_of Connection, connection
@@ -114,7 +108,6 @@ class DatabaseTestCases < Test::Unit::TestCase
   end
   
   def test_drop_instance
-    rm_rf @db_file
     assert !File.exists?(@db_file)
     db = Database.create(@parms)
     assert File.exists?(@db_file)
@@ -123,7 +116,6 @@ class DatabaseTestCases < Test::Unit::TestCase
   end
   
   def test_drop_singleton
-    rm_rf @db_file
     assert !File.exists?(@db_file)
     Database.create(@parms)
     assert File.exists?(@db_file)

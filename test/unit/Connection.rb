@@ -28,8 +28,8 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert connection.transaction_started
       connection.rollback
       assert !connection.transaction_started
+      connection.drop
     end
-    Database.drop(@parms)
   end
   
   def test_execute
@@ -40,20 +40,20 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert connection.transaction_started
       connection.commit
       assert !connection.transaction_started
+      connection.drop
     end
-    Database.drop(@parms)
   end
 
   def test_dialects
     db = Database.create(@parms) do |connection|
       assert_equal 3, connection.dialect
       assert_equal 3, connection.db_dialect
+      connection.drop
     end
   end
   
   def test_open?
-    db = Database.new(@parms);
-    db.create
+    db = Database.create(@parms);
     connection = db.connect
     assert connection.open?
     connection.close
@@ -61,13 +61,45 @@ class ConnectionTestCases < Test::Unit::TestCase
     db.drop
   end
   
-  def test_properties
+  def test_properties_instance
+    db = Database.new(@parms)
+    db.create
+    db.connect do |connection|
+      assert_equal @parms[:database], connection.database
+      assert_equal @parms[:username], connection.username
+      assert_equal @parms[:password], connection.password
+      assert_equal @parms[:role], connection.role
+      assert_equal @parms[:charset], connection.charset
+      connection.drop
+    end
+  end
+  
+  def test_properties_singleton
     Database.create(@parms) do |connection|
       assert_equal @parms[:database], connection.database
       assert_equal @parms[:username], connection.username
       assert_equal @parms[:password], connection.password
       assert_equal @parms[:role], connection.role
       assert_equal @parms[:charset], connection.charset
+      connection.drop
+    end
+  end
+  
+  def test_drop_instance
+    db = Database.create(@parms)
+    assert File.exists?(@db_file)
+    connection = db.connect
+    assert connection.open?    
+    connection.drop
+    assert !connection.open?
+    assert !File.exists?(@db_file)
+  end
+  
+  def test_drop_singleton
+    Database.create(@parms) do |connection|
+      assert File.exists?(@db_file)
+      connection.drop
+      assert !File.exists?(@db_file)
     end
   end
   
