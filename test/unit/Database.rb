@@ -74,13 +74,19 @@ class DatabaseTestCases < Test::Unit::TestCase
   end
   
   def test_create_singleton
-    rm_rf 'c:/var/fbdata/testrbfb.fdb'
+    rm_rf @db_file
     db = Database.create(@parms);
     assert File.exists?(@db_file)
   end
 
+  def test_create_singleton_with_defaults
+    rm_rf @db_file
+    db = Database.create(:database => "localhost:#{@db_file}");
+    assert File.exists?(@db_file)
+  end
+
   def test_create_singleton_block
-    rm_rf 'c:/var/fbdata/testrbfb.fdb'
+    rm_rf @db_file
     db = Database.create(@parms) do |connection|
       connection.execute("select * from RDB$DATABASE") do |cursor|
         row = cursor.fetch
@@ -95,26 +101,16 @@ class DatabaseTestCases < Test::Unit::TestCase
     rm_rf @db_file
     db = Database.create(@parms)
     connection = db.connect
-    begin
-      assert_instance_of Connection, connection
-      assert_equal 3, connection.dialect
-      assert_equal 3, connection.db_dialect
-    ensure
-      connection.close
-    end
+    assert_instance_of Connection, connection
+    connection.close
   end
 
   def test_connect_singleton
     rm_rf @db_file
     db = Database.create(@parms)
     connection = Database.connect(@parms)
-    begin
-      assert_instance_of Connection, connection
-      assert_equal 3, connection.dialect
-      assert_equal 3, connection.db_dialect
-    ensure
-      connection.close
-    end
+    assert_instance_of Connection, connection
+    connection.close
   end
   
   def test_drop_instance

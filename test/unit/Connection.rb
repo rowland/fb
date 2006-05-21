@@ -13,10 +13,10 @@ class ConnectionTestCases < Test::Unit::TestCase
       :password => 'masterkey',
       :charset => 'NONE',
       :role => 'READER' }
+    rm_rf @db_file
   end
   
   def test_transaction
-    rm_rf @db_file
     Database.create(@parms) do |connection|
       n = 0
       assert !connection.transaction_started
@@ -33,7 +33,6 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
   
   def test_execute
-    rm_rf @db_file
     Database.create(@parms) do |connection|
       assert !connection.transaction_started
       connection.execute("create table test (id int, name varchar(20));");
@@ -46,7 +45,6 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
 
   def test_dialects
-    rm_rf @db_file
     db = Database.create(@parms) do |connection|
       assert_equal 3, connection.dialect
       assert_equal 3, connection.db_dialect
@@ -54,7 +52,6 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
   
   def test_open?
-    rm_rf @db_file
     db = Database.new(@parms);
     db.create
     connection = db.connect
@@ -62,5 +59,27 @@ class ConnectionTestCases < Test::Unit::TestCase
     connection.close
     assert !connection.open?
     db.drop
+  end
+  
+  def test_properties
+    Database.create(@parms) do |connection|
+      assert_equal @parms[:database], connection.database
+      assert_equal @parms[:username], connection.username
+      assert_equal @parms[:password], connection.password
+      assert_equal @parms[:role], connection.role
+      assert_equal @parms[:charset], connection.charset
+    end
+  end
+  
+  def test_to_s
+    db = Database.new(@parms)
+    db.create
+    connection = db.connect
+    begin
+      assert_equal "#{@parms[:database]} (OPEN)", connection.to_s
+    ensure
+      connection.close
+      assert_equal "#{@parms[:database]} (CLOSED)", connection.to_s
+    end
   end
 end

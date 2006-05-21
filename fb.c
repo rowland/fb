@@ -742,6 +742,23 @@ static VALUE global_rollback()
 
 /* connection methods */
 
+static VALUE connection_is_open(VALUE self)
+{
+	struct FbConnection *fb_connection;
+
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	return (fb_connection->db == 0) ? Qfalse : Qtrue;
+}
+
+static VALUE connection_to_s(VALUE self)
+{
+	VALUE is_open = connection_is_open(self);
+	VALUE status = (is_open == Qtrue) ? rb_str_new2(" (OPEN)") : rb_str_new2(" (CLOSED)");
+	VALUE database = rb_iv_get(self, "@database");
+	VALUE s = rb_str_dup(database);
+	return rb_str_concat(s, status);
+}
+
 static VALUE connection_cursor(VALUE self)
 {
 	VALUE c;
@@ -787,14 +804,6 @@ static VALUE connection_close(VALUE self)
 	fb_connection_drop_cursors(fb_connection);
 
 	return Qnil;
-}
-
-static VALUE connection_is_open(VALUE self)
-{
-	struct FbConnection *fb_connection;
-
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
-	return (fb_connection->db == 0) ? Qfalse : Qtrue;
 }
 
 static VALUE connection_dialect(VALUE self)
@@ -1686,8 +1695,21 @@ static char* connection_create_dbp(VALUE self, int *length)
 	return dbp;
 }
 
-static VALUE connection_create(isc_db_handle handle)
+static char* CONNECTION_PARMS[6] = {
+	"@database",
+	"@username",
+	"@password",
+	"@charset",
+	"@role",
+	(char *)0
+};
+
+static VALUE connection_create(isc_db_handle handle, VALUE db)
 {
+	unsigned short dialect;
+	unsigned short db_dialect;
+	char *parm;
+	int i;
 	struct FbConnection *fb_connection;
 	VALUE connection = Data_Make_Struct(rb_cFbConnection, struct FbConnection, fb_connection_mark, fb_connection_free, fb_connection);
 	fb_connection->db = handle;
@@ -1701,37 +1723,30 @@ static VALUE connection_create(isc_db_handle handle)
 	fb_connection->next = fb_connection_list;
 	fb_connection_list = fb_connection;
 
-	{
-		unsigned short dialect = SQL_DIALECT_CURRENT;
-		unsigned short db_dialect = fb_connection_db_SQL_Dialect(fb_connection);
+	dialect = SQL_DIALECT_CURRENT;
+	db_dialect = fb_connection_db_SQL_Dialect(fb_connection);
 
-		if (db_dialect < dialect) {
-			dialect = db_dialect;
-			/* TODO: downgrade warning */
-		}
+	if (db_dialect < dialect) {
+		dialect = db_dialect;
+		/* TODO: downgrade warning */
+	}
 
-		fb_connection->dialect = dialect;
-		fb_connection->db_dialect = db_dialect;
+	fb_connection->dialect = dialect;
+	fb_connection->db_dialect = db_dialect;
+
+	for (i = 0; parm = CONNECTION_PARMS[i]; i++) {
+		rb_iv_set(connection, parm, rb_iv_get(db, parm));
 	}
 	
 	return connection;
 }
-
-static char* CONNECTION_PARMS[6] = {
-	"database",
-	"username",
-	"password",
-	"charset",
-	"role",
-	(char *)0
-};
 
 static void define_attrs(VALUE klass, char **attrs)
 {
 	char *parm;
 	while (parm = *attrs)
 	{
-		rb_define_attr(klass, parm, 1, 1);
+		rb_define_attr(klass, parm+1, 1, 1);
 		attrs++;
 	}
 }
@@ -1740,8 +1755,7 @@ static VALUE default_string(VALUE hash, char *key, char *def)
 {
 	VALUE sym = ID2SYM(rb_intern(key));
 	VALUE val = rb_hash_aref(hash, sym);
-	val = StringValue(val);
-	return NIL_P(val) ? rb_str_new2(def) : val;
+	return NIL_P(val) ? rb_str_new2(def) : StringValue(val);
 }
 
 static VALUE default_int(VALUE hash, char *key, int def)
@@ -1797,7 +1811,7 @@ static VALUE database_create(VALUE self)
 	}
 	if (handle) {
 		if (rb_block_given_p()) {
-			VALUE connection = connection_create(handle);
+			VALUE connection = connection_create(handle, self);
 			rb_ensure(rb_yield,connection,connection_close,connection);
 		} else {
 			isc_detach_database(isc_status, &handle);
@@ -1827,7 +1841,7 @@ static VALUE database_connect(VALUE self)
 	free(dbp);
 	fb_error_check(isc_status);
 	{
-		VALUE connection = connection_create(handle);
+		VALUE connection = connection_create(handle, self);
 		if (rb_block_given_p()) {
 			return rb_ensure(rb_yield, connection, connection_close, connection);
 			return Qnil;
@@ -1880,6 +1894,8 @@ void Init_fb()
 	rb_define_singleton_method(rb_cFbDatabase, "drop", database_s_drop, -1);
 
 	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
+    define_attrs(rb_cFbConnection, CONNECTION_PARMS);
+    rb_define_method(rb_cFbConnection, "to_s", connection_to_s, 0);
 	//rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0);
 	rb_define_method(rb_cFbConnection, "execute", connection_execute, -1);
 	rb_define_method(rb_cFbConnection, "transaction", global_transaction, -1);
