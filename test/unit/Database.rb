@@ -86,8 +86,6 @@ class DatabaseTestCases < Test::Unit::TestCase
         row = cursor.fetch
         assert_instance_of Array, row
       end
-      assert_equal 3, connection.dialect
-      assert_equal 3, connection.db_dialect
     end
     assert_instance_of Database, db
     assert File.exists?(@db_file)

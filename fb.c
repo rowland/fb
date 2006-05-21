@@ -789,6 +789,14 @@ static VALUE connection_close(VALUE self)
 	return Qnil;
 }
 
+static VALUE connection_is_open(VALUE self)
+{
+	struct FbConnection *fb_connection;
+
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	return (fb_connection->db == 0) ? Qfalse : Qtrue;
+}
+
 static VALUE connection_dialect(VALUE self)
 {
 	struct FbConnection *fb_connection;
@@ -1730,8 +1738,7 @@ static void define_attrs(VALUE klass, char **attrs)
 
 static VALUE default_string(VALUE hash, char *key, char *def)
 {
-	ID id = rb_intern(key);
-	VALUE sym = ID2SYM(id);
+	VALUE sym = ID2SYM(rb_intern(key));
 	VALUE val = rb_hash_aref(hash, sym);
 	val = StringValue(val);
 	return NIL_P(val) ? rb_str_new2(def) : val;
@@ -1739,8 +1746,7 @@ static VALUE default_string(VALUE hash, char *key, char *def)
 
 static VALUE default_int(VALUE hash, char *key, int def)
 {
-	ID id = rb_intern(key);
-	VALUE sym = ID2SYM(id);
+	VALUE sym = ID2SYM(rb_intern(key));
 	VALUE val = rb_hash_aref(hash, sym);
 	return NIL_P(val) ? INT2NUM(def) : val;
 }
@@ -1881,6 +1887,7 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "commit", global_commit, 0);
 	rb_define_method(rb_cFbConnection, "rollback", global_rollback, 0);
 	rb_define_method(rb_cFbConnection, "close", connection_close, 0);
+	rb_define_method(rb_cFbConnection, "open?", connection_is_open, 0);
 	rb_define_method(rb_cFbConnection, "dialect", connection_dialect, 0);
 	rb_define_method(rb_cFbConnection, "db_dialect", connection_db_dialect, 0);
 
