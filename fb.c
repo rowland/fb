@@ -930,7 +930,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 	static char blob_items[] = { isc_info_blob_max_segment };
 	char blob_info[16];
 	char *p;
-	unsigned short length;
+	long length;
 	struct time_object *tobj;
 
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);

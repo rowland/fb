@@ -43,6 +43,104 @@ class ConnectionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
+  
+  def test_insert_commit
+    sql_schema = "create table test (id int, name varchar(20))"
+    sql_insert = "insert into test (id, name) values (?, ?)"
+    sql_select = "select * from test order by id"
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema);
+      connection.commit;
+      10.times do |i|
+        connection.execute(sql_insert, i, i.to_s);
+      end
+      connection.commit
+      connection.execute(sql_select) do |cursor|
+        rows = cursor.fetchall
+        assert 10, rows.size
+        10.times do |i|
+          assert i, rows[i][0]
+          assert i.to_s, rows[i][1]
+        end
+      end
+      connection.drop
+    end
+  end
+  
+  def test_insert_rollback
+    sql_schema = "create table test (id int, name varchar(20))"
+    sql_insert = "insert into test (id, name) values (?, ?)"
+    sql_select = "select * from test order by id"
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema);
+      connection.commit;
+      10.times do |i|
+        connection.execute(sql_insert, i, i.to_s);
+      end
+      connection.rollback
+      connection.execute(sql_select) do |cursor|
+        rows = cursor.fetchall
+        assert 0, rows.size
+      end
+      connection.drop
+    end
+  end
+  
+  def test_insert_blobs_text
+    sql_schema = "create table test (id int, name varchar(20), memo blob sub_type text)"
+    sql_insert = "insert into test (id, name, memo) values (?, ?, ?)"
+    sql_select = "select * from test order by id"
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema);
+      connection.commit;
+      memo = IO.read("fb.c")
+      assert memo.size > 50000
+      10.times do |i|
+        connection.execute(sql_insert, i, i.to_s, memo);
+      end
+      connection.commit
+      connection.execute(sql_select) do |cursor|
+        i = 0
+        cursor.each :hash do |row|
+          assert_equal i, row["ID"]
+          assert_equal i.to_s, row["NAME"]
+          assert_equal memo, row["MEMO"]
+          i += 1
+        end
+      end
+      connection.drop
+    end
+  end
+
+  def test_insert_blobs_binary
+    sql_schema = "create table test (id int, name varchar(20), attachment blob segment size 1000)"
+    sql_insert = "insert into test (id, name, attachment) values (?, ?, ?)"
+    sql_select = "select * from test order by id"
+    #filename = "data.dat"
+    filename = "fb.c"
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema);
+      connection.commit;
+      attachment = File.open(filename,"rb") do |f|
+        f.read * 3
+      end
+      assert (attachment.size > 150000), "Not expected size"
+      3.times do |i|
+        connection.execute(sql_insert, i, i.to_s, attachment);
+      end
+      connection.commit
+      connection.execute(sql_select) do |cursor|
+        i = 0
+        cursor.each :array do |row|
+          assert_equal i, row[0], "ID's do not match"
+          assert_equal i.to_s, row[1], "NAME's do not match"
+          assert_equal attachment.size, row[2].size, "ATTACHMENT sizes do not match"
+          i += 1
+        end
+      end
+      connection.drop
+    end
+  end
 
   def test_dialects
     db = Database.create(@parms) do |connection|
