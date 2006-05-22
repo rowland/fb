@@ -1648,37 +1648,37 @@ static VALUE fb_hash_from_ary(VALUE fields, VALUE row)
 	return hash;
 }
 
+static int hash_format(int argc, VALUE *argv)
+{
+	if (argc == 0 || argv[0] == ID2SYM(rb_intern("array"))) {
+		return FALSE;
+	} else if (argv[0] == ID2SYM(rb_intern("hash"))) {
+		return TRUE;
+	} else {
+		rb_raise(rb_eFbError, "Unknown format");
+	}		
+}
+
 static VALUE cursor_fetch(int argc, VALUE* argv, VALUE self)
 {
-	VALUE ary, hash;
+	VALUE ary;
 	struct FbCursor *fb_cursor;
 
+	int hash_row = hash_format(argc, argv);
+	
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 	fb_cursor_fetch_prep(fb_cursor);
 
 	ary = fb_cursor_fetch(fb_cursor);
-	if (argc == 0 || argv[0] == ID2SYM(rb_intern("array"))) {
-		return ary;
-	} else if (argv[0] == ID2SYM(rb_intern("hash"))) {
-		return fb_hash_from_ary(fb_cursor->fields_ary, ary);
-	} else {
-		rb_raise(rb_eFbError, "Unknown format");
-	}		
+	return hash_row ? fb_hash_from_ary(fb_cursor->fields_ary, ary) : ary;
 }
 
 static VALUE cursor_fetchall(int argc, VALUE* argv, VALUE self)
 {
 	VALUE ary, row;
 	struct FbCursor *fb_cursor;
-	int hash_rows;
-
-	if (argc == 0 || argv[0] == ID2SYM(rb_intern("array"))) {
-		hash_rows = FALSE;
-	} else if (argv[0] == ID2SYM(rb_intern("hash"))) {
-		hash_rows = TRUE;
-	} else {
-		rb_raise(rb_eFbError, "Unknown format");
-	}		
+	
+	int hash_rows = hash_format(argc, argv);
 
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 	fb_cursor_fetch_prep(fb_cursor);
@@ -1697,18 +1697,24 @@ static VALUE cursor_fetchall(int argc, VALUE* argv, VALUE self)
 	return ary;
 }
 
-static VALUE cursor_each(VALUE self)
+static VALUE cursor_each(int argc, VALUE* argv, VALUE self)
 {
 	VALUE ary, row;
 	struct FbCursor *fb_cursor;
 
+	int hash_rows = hash_format(argc, argv);
+	
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 	fb_cursor_fetch_prep(fb_cursor);
 
 	for (;;) {
 		row = fb_cursor_fetch(fb_cursor);
 		if (NIL_P(row)) break;
-		rb_yield(row);
+		if (hash_rows) {
+			rb_yield(fb_hash_from_ary(fb_cursor->fields_ary, row));
+		} else {
+			rb_yield(row);
+		}
 	}
 
 	return Qnil;
@@ -2054,7 +2060,7 @@ void Init_fb()
 	rb_define_method(rb_cFbCursor, "fields", cursor_fields, -1);
 	rb_define_method(rb_cFbCursor, "fetch", cursor_fetch, -1);
 	rb_define_method(rb_cFbCursor, "fetchall", cursor_fetchall, -1);
-	rb_define_method(rb_cFbCursor, "each", cursor_each, 0);
+	rb_define_method(rb_cFbCursor, "each", cursor_each, -1);
 	rb_define_method(rb_cFbCursor, "close", cursor_close, 0);
 	rb_define_method(rb_cFbCursor, "drop", cursor_drop, 0);
 

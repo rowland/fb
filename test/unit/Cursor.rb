@@ -97,4 +97,34 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
+  
+  def test_each_array
+    Database.create(@parms) do |connection|
+      connection.execute("select * from rdb$database") do |cursor|
+        count = 0
+        cursor.each :array do |row|
+          count += 1
+          assert_instance_of Array, row
+          assert_equal 4, row.size
+        end
+        assert_equal 1, count
+      end
+      connection.drop
+    end
+  end
+  
+  def test_each_hash
+    Database.create(@parms) do |connection|
+      connection.execute("select * from rdb$database") do |cursor|
+        count = 0
+        cursor.each :hash do |row|
+          count += 1
+          assert_instance_of Hash, row
+          assert_equal 4, row.size
+        end
+        assert_equal 1, count
+      end
+      connection.drop
+    end
+  end
 end
