@@ -1794,9 +1794,12 @@ static VALUE database_allocate_instance(VALUE klass)
 
 static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 {
+	VALUE parms, database;
+	
 	if (argc >= 1) {
-		VALUE parms = argv[0];
-		VALUE database = rb_hash_aref(parms, ID2SYM(rb_intern("database")));
+		parms = argv[0];
+		Check_Type(parms, T_HASH);
+		database = rb_hash_aref(parms, ID2SYM(rb_intern("database")));
 		if (NIL_P(database)) rb_raise(rb_eFbError, "Database must be specified.");
 		rb_iv_set(self, "@database", database);
 		rb_iv_set(self, "@username", default_string(parms, "username", "sysdba"));

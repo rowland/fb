@@ -92,6 +92,12 @@ class DatabaseTestCases < Test::Unit::TestCase
     assert_instance_of Database, db
     assert File.exists?(@db_file)
   end
+  
+  def test_create_bad_param
+    assert_raise TypeError do
+      db = Database.create('asdf')
+    end
+  end
 
   def test_connect_instance
     db = Database.create(@parms)
