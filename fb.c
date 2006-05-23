@@ -164,6 +164,14 @@ static VALUE fb_error_msg(long *isc_status)
 	return result;
 }
 
+static VALUE fb_mktime(struct tm *tm)
+{
+	return rb_funcall(
+		rb_cTime, rb_intern("utc"), 6, 
+		INT2FIX(tm->tm_year), INT2FIX(tm->tm_mon), INT2FIX(tm->tm_mday),
+		INT2FIX(tm->tm_hour), INT2FIX(tm->tm_min), INT2FIX(tm->tm_sec));
+}
+
 static void fb_error_check(long *isc_status)
 {
 	short code = isc_sqlcode(isc_status);
@@ -1439,9 +1447,15 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 				case SQL_TYPE_TIME:
 					isc_decode_sql_time((ISC_TIME *)var->sqldata, &tms);
+					/*
 					t = mktime(&tms);
-					if (t < 0) t = 0;
+					if (t < 0) t = t + (24 * 60 * 60);
 					val = rb_time_new(t, 0);
+					*/
+					tms.tm_year = 1970;
+					tms.tm_mon = 1;
+					tms.tm_mday = 1;
+					val = fb_mktime(&tms);
 					break;
 
 				case SQL_TYPE_DATE:

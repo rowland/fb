@@ -6,7 +6,8 @@ include FileUtils
 
 class DatabaseTestCases < Test::Unit::TestCase
   def setup
-    @db_file = 'c:/var/fbdata/testrbfb.fdb'
+    @db_file = 'c:/var/fbdata/drivertest.fdb'
+    @database = "localhost:#{@db_file}"
     @parms = {
       :database => "localhost:#{@db_file}",
       :username => 'sysdba',
@@ -32,8 +33,8 @@ class DatabaseTestCases < Test::Unit::TestCase
 
   def test_properties_write
     db = Database.new
-    db.database = 'localhost:/var/fbdata/testrbfb.fdb'
-    assert_equal 'localhost:/var/fbdata/testrbfb.fdb', db.database
+    db.database = @database
+    assert_equal @database, db.database
     db.username = 'sysdba'
     assert_equal 'sysdba', db.username
     db.password = 'masterkey'
@@ -46,7 +47,7 @@ class DatabaseTestCases < Test::Unit::TestCase
   
   def test_initialize
     db = Database.new(@parms)
-    assert_equal 'localhost:c:/var/fbdata/testrbfb.fdb', db.database
+    assert_equal @database, db.database
     assert_equal 'sysdba', db.username
     assert_equal 'masterkey', db.password
     assert_equal 'NONE', db.charset

@@ -6,7 +6,7 @@ include FileUtils
 
 class ConnectionTestCases < Test::Unit::TestCase
   def setup
-    @db_file = 'c:/var/fbdata/testrbfb.fdb'
+    @db_file = 'c:/var/fbdata/drivertest.fdb'
     @parms = {
       :database => "localhost:#{@db_file}",
       :username => 'sysdba',
