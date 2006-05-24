@@ -262,4 +262,20 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert_equal 'VIEW2', names[1]
     end
   end
+
+  def test_role_names
+    $sql_schema = <<-END
+      create role reader;
+      create role writer;
+    END
+    Database.create(@parms) do |connection|
+      $sql_schema.strip.split(';').each do |stmt|
+        connection.execute(stmt);
+      end
+      connection.commit
+      names = connection.role_names
+      assert_equal 'READER', names[0]
+      assert_equal 'WRITER', names[1]
+    end
+  end
 end
