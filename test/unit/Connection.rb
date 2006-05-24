@@ -244,4 +244,22 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert_equal 'TEST2_SEQ', names[1]
     end
   end
+
+  def test_view_names
+    $sql_schema = <<-END
+      create table test1 (id int, name1 varchar(10));
+      create table test2 (id int, name2 varchar(10));
+      create view view1 as select test1.id, test1.name1, test2.name2 from test1 join test2 on test1.id = test2.id;
+      create view view2 as select test2.id, test1.name1, test2.name2 from test1 join test2 on test1.name1 = test2.name2;
+    END
+    Database.create(@parms) do |connection|
+      $sql_schema.strip.split(';').each do |stmt|
+        connection.execute(stmt);
+      end
+      connection.commit
+      names = connection.view_names
+      assert_equal 'VIEW1', names[0]
+      assert_equal 'VIEW2', names[1]
+    end
+  end
 end

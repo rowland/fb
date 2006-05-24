@@ -1882,6 +1882,14 @@ static VALUE connection_generator_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+static VALUE connection_view_names(VALUE self)
+{
+	char *sql = "SELECT RDB$RELATION_NAME, RDB$OWNER_NAME, RDB$VIEW_SOURCE FROM RDB$RELATIONS "
+				"WHERE (RDB$SYSTEM_FLAG <> 1 OR RDB$SYSTEM_FLAG IS NULL) AND NOT RDB$VIEW_BLR IS NULL AND RDB$FLAGS = 1 "
+				"ORDER BY RDB$RELATION_ID";
+	return connection_names(self, sql);
+}
+
 static void define_attrs(VALUE klass, char **attrs)
 {
 	char *parm;
@@ -2053,6 +2061,7 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "db_dialect", connection_db_dialect, 0);
 	rb_define_method(rb_cFbConnection, "table_names", connection_table_names, 0);
 	rb_define_method(rb_cFbConnection, "generator_names", connection_generator_names, 0);
+	rb_define_method(rb_cFbConnection, "view_names", connection_view_names, 0);
 
 	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
 	rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1);
