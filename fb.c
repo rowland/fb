@@ -1896,6 +1896,13 @@ static VALUE connection_role_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+static VALUE connection_procedure_names(VALUE self)
+{
+	char *sql = "SELECT RDB$PROCEDURE_NAME FROM RDB$PROCEDURES "
+				"ORDER BY RDB$PROCEDURE_NAME";
+	return connection_names(self, sql);
+}
+
 static void define_attrs(VALUE klass, char **attrs)
 {
 	char *parm;
@@ -2069,6 +2076,7 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "generator_names", connection_generator_names, 0);
 	rb_define_method(rb_cFbConnection, "view_names", connection_view_names, 0);
 	rb_define_method(rb_cFbConnection, "role_names", connection_role_names, 0);
+	rb_define_method(rb_cFbConnection, "procedure_names", connection_procedure_names, 0);
 
 	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
 	rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1);

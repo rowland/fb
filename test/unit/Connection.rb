@@ -214,12 +214,12 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
   
   def test_table_names
-    $sql_schema = <<-END
+    sql_schema = <<-END
       create table test1 (id int);
       create table test2 (id int);
     END
     Database.create(@parms) do |connection|
-      $sql_schema.strip.split(';').each do |stmt|
+      sql_schema.strip.split(';').each do |stmt|
         connection.execute(stmt);
       end
       connection.commit
@@ -230,12 +230,12 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
 
   def test_generator_names
-    $sql_schema = <<-END
+    sql_schema = <<-END
       create generator test1_seq;
       create generator test2_seq;
     END
     Database.create(@parms) do |connection|
-      $sql_schema.strip.split(';').each do |stmt|
+      sql_schema.strip.split(';').each do |stmt|
         connection.execute(stmt);
       end
       connection.commit
@@ -246,14 +246,14 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
 
   def test_view_names
-    $sql_schema = <<-END
+    sql_schema = <<-END
       create table test1 (id int, name1 varchar(10));
       create table test2 (id int, name2 varchar(10));
       create view view1 as select test1.id, test1.name1, test2.name2 from test1 join test2 on test1.id = test2.id;
       create view view2 as select test2.id, test1.name1, test2.name2 from test1 join test2 on test1.name1 = test2.name2;
     END
     Database.create(@parms) do |connection|
-      $sql_schema.strip.split(';').each do |stmt|
+      sql_schema.strip.split(';').each do |stmt|
         connection.execute(stmt);
       end
       connection.commit
@@ -264,18 +264,34 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
 
   def test_role_names
-    $sql_schema = <<-END
+    sql_schema = <<-END
       create role reader;
       create role writer;
     END
     Database.create(@parms) do |connection|
-      $sql_schema.strip.split(';').each do |stmt|
+      sql_schema.strip.split(';').each do |stmt|
         connection.execute(stmt);
       end
       connection.commit
       names = connection.role_names
       assert_equal 'READER', names[0]
       assert_equal 'WRITER', names[1]
+    end
+  end
+  
+  def test_procedure_names
+    sql_schema = <<-END_SQL
+      CREATE PROCEDURE PLUSONE(NUM1 INTEGER) RETURNS (NUM2 INTEGER) AS
+      BEGIN
+        NUM2 = NUM1 + 1;
+        SUSPEND;
+      END;
+    END_SQL
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema)
+      connection.commit
+      names = connection.procedure_names
+      assert_equal 'PLUSONE', names[0]
     end
   end
 end
