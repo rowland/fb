@@ -1849,24 +1849,37 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	return connection;
 }
 
-static VALUE connection_table_names(VALUE self)
+static VALUE connection_names(VALUE self, char *sql)
 {
 	VALUE row;
-	char *sql = "SELECT RDB$RELATION_NAME FROM RDB$RELATIONS "
-				"WHERE (RDB$SYSTEM_FLAG <> 1 OR RDB$SYSTEM_FLAG IS NULL) AND RDB$VIEW_BLR IS NULL "
-				"ORDER BY RDB$RELATION_NAME";
 	VALUE query = rb_str_new2(sql);
 	VALUE cursor = connection_execute(1, &query, self);
-	VALUE table_names = rb_ary_new();
+	VALUE names = rb_ary_new();
 	ID id_rstrip_bang = rb_intern("rstrip!");
 	
 	while ((row = cursor_fetch(0, NULL, cursor)) != Qnil) {
 		VALUE name = rb_ary_entry(row, 0);
-		rb_ary_push(table_names, rb_funcall(name, id_rstrip_bang, 0));
+		rb_ary_push(names, rb_funcall(name, id_rstrip_bang, 0));
 	}
 
 	cursor_close(cursor);
-	return table_names;
+	return names;
+}
+
+static VALUE connection_table_names(VALUE self)
+{
+	char *sql = "SELECT RDB$RELATION_NAME FROM RDB$RELATIONS "
+				"WHERE (RDB$SYSTEM_FLAG <> 1 OR RDB$SYSTEM_FLAG IS NULL) AND RDB$VIEW_BLR IS NULL "
+				"ORDER BY RDB$RELATION_NAME";
+	return connection_names(self, sql);
+}
+
+static VALUE connection_generator_names(VALUE self)
+{
+	char *sql = "SELECT RDB$GENERATOR_NAME FROM RDB$GENERATORS "
+				"WHERE (RDB$SYSTEM_FLAG IS NULL OR RDB$SYSTEM_FLAG <> 1) "
+				"ORDER BY RDB$GENERATOR_NAME";
+	return connection_names(self, sql);
 }
 
 static void define_attrs(VALUE klass, char **attrs)
@@ -2039,6 +2052,7 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "dialect", connection_dialect, 0);
 	rb_define_method(rb_cFbConnection, "db_dialect", connection_db_dialect, 0);
 	rb_define_method(rb_cFbConnection, "table_names", connection_table_names, 0);
+	rb_define_method(rb_cFbConnection, "generator_names", connection_generator_names, 0);
 
 	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
 	rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1);

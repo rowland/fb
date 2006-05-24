@@ -228,4 +228,20 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert_equal 'TEST2', table_names[1]
     end
   end
+
+  def test_generator_names
+    $sql_schema = <<-END
+      create generator test1_seq;
+      create generator test2_seq;
+    END
+    Database.create(@parms) do |connection|
+      $sql_schema.strip.split(';').each do |stmt|
+        connection.execute(stmt);
+      end
+      connection.commit
+      names = connection.generator_names
+      assert_equal 'TEST1_SEQ', names[0]
+      assert_equal 'TEST2_SEQ', names[1]
+    end
+  end
 end
