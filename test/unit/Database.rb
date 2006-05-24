@@ -14,6 +14,18 @@ class DatabaseTestCases < Test::Unit::TestCase
       :password => 'masterkey',
       :charset => 'NONE',
       :role => 'READER' }
+    @reader = {
+      :database => "localhost:#{@db_file}",
+      :username => 'rubytest',
+      :password => 'rubytest',
+      :charset => 'NONE',
+      :role => 'READER' }
+    @writer = {
+      :database => "localhost:#{@db_file}",
+      :username => 'rubytest',
+      :password => 'rubytest',
+      :charset => 'NONE',
+      :role => 'WRITER' }
     rm_rf @db_file
   end
   
@@ -128,6 +140,32 @@ class DatabaseTestCases < Test::Unit::TestCase
     assert File.exists?(@db_file)
     Database.drop(@parms)
     assert !File.exists?(@db_file)
+  end
+  
+  def test_role_support
+    Database.create(@parms) do |connection|
+      connection.execute("create table test (id int, test varchar(10))")
+      connection.execute("create role writer")
+      connection.execute("grant all on test to writer")
+      connection.execute("grant writer to rubytest")
+      connection.commit
+      connection.execute("insert into test values (1, 'test role')")
+    end
+    Database.connect(@reader) do |connection|
+      assert_raise Error do
+        connection.execute("select * from test") do |cursor|
+          flunk "Should not reach here."
+        end
+      end
+    end
+    Database.connect(@writer) do |connection|
+      connection.execute("select * from test") do |cursor|
+        row = cursor.fetch :hash
+        assert_equal 1, row["ID"]
+        assert_equal 'test role', row["TEST"]
+      end
+    end
+    Database.drop(@parms)
   end
 end
     
