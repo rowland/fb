@@ -212,4 +212,20 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert_equal "#{@parms[:database]} (CLOSED)", connection.to_s
     end
   end
+  
+  def test_table_names
+    $sql_schema = <<-END
+      create table test1 (id int);
+      create table test2 (id int);
+    END
+    Database.create(@parms) do |connection|
+      $sql_schema.strip.split(';').each do |stmt|
+        connection.execute(stmt);
+      end
+      connection.commit
+      table_names = connection.table_names
+      assert_equal 'TEST1', table_names[0]
+      assert_equal 'TEST2', table_names[1]
+    end
+  end
 end
