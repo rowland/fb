@@ -127,4 +127,30 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
+  
+  def test_fetch_after_nil
+    Database.create(@parms) do |connection|
+      connection.execute("create generator test_seq");
+      connection.commit
+      connection.execute("select gen_id(test_seq, 1) from rdb$database") do |cursor|
+        r1 = cursor.fetch
+        assert_not_nil r1
+        r2 = cursor.fetch
+        assert_nil r2
+        assert_raise Error do
+          r3 = cursor.fetch
+        end
+      end
+      connection.execute("select * from rdb$database") do |cursor|
+        r1 = cursor.fetch
+        assert_not_nil r1
+        r2 = cursor.fetch
+        assert_nil r2
+        assert_raise Error do
+          r3 = cursor.fetch
+        end
+      end
+      connection.drop
+    end
+  end
 end
