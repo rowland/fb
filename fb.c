@@ -50,7 +50,6 @@ static VALUE rb_cFbCursor;
 static VALUE rb_eFbError;
 static VALUE rb_sFbField;
 
-static long isc_status[20];	/* status vector */
 static char isc_info_stmt[] = { isc_info_sql_stmt_type };
 static char isc_info_buff[16];
 static char isc_tpb_0[] = {
@@ -299,6 +298,8 @@ static void fb_connection_remove(struct FbConnection *fb_connection)
 
 static void fb_connection_disconnect(struct FbConnection *fb_connection)
 {
+	long isc_status[20];
+	
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
 		fb_error_check(isc_status);
@@ -314,6 +315,8 @@ static void fb_connection_disconnect(struct FbConnection *fb_connection)
 
 static void fb_connection_disconnect_warn(struct FbConnection *fb_connection)
 {
+	long isc_status[20];
+	
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
 		fb_error_check_warn(isc_status);
@@ -348,6 +351,7 @@ static struct FbConnection* fb_connection_check_retrieve(VALUE data)
 
 static unsigned short fb_connection_db_SQL_Dialect(struct FbConnection *fb_connection)
 {
+	long isc_status[20];
 	long dialect;
 	long length;
 	char db_info_command = isc_info_db_SQL_dialect;
@@ -700,6 +704,7 @@ static void set_teb_vec(ISC_TEB *vec, struct FbConnection *fb_connection, char *
 
 static void transaction_start(VALUE opt, int argc, VALUE *argv)
 {
+	long isc_status[20];
 	struct FbConnection *fb_connection;
 	ISC_TEB *teb_vec = ALLOCA_N(ISC_TEB, db_num);
 	ISC_TEB *vec = teb_vec;
@@ -758,6 +763,7 @@ static VALUE global_transaction_started()
 
 static VALUE global_commit()
 {
+	long isc_status[20];
 	fb_connection_close_cursors();
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
@@ -769,6 +775,7 @@ static VALUE global_commit()
 
 static VALUE global_rollback()
 {
+	long isc_status[20];
 	fb_connection_close_cursors();
 	if (transact) {
 		isc_rollback_transaction(isc_status, &transact);
@@ -799,6 +806,7 @@ static VALUE connection_to_s(VALUE self)
 
 static VALUE connection_cursor(VALUE self)
 {
+	long isc_status[20];
 	VALUE c;
 	struct FbConnection *fb_connection;
 	struct FbCursor *fb_cursor;
@@ -893,6 +901,7 @@ static void fb_cursor_check(struct FbCursor *fb_cursor)
 
 static void fb_cursor_drop(struct FbCursor *fb_cursor)
 {
+	long isc_status[20];
 	if (fb_cursor->open) {
 		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
 		fb_error_check(isc_status);
@@ -904,6 +913,7 @@ static void fb_cursor_drop(struct FbCursor *fb_cursor)
 
 static void fb_cursor_drop_warn(struct FbCursor *fb_cursor)
 {
+	long isc_status[20];
 	if (fb_cursor->open) {
 		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
 		fb_error_check_warn(isc_status);
@@ -961,6 +971,8 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 	long length;
 	struct time_object *tobj;
 
+	long isc_status[20];
+	
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 
 	/* Check the number of parameters */
@@ -1145,6 +1157,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, VALUE *argv)
 {
 	struct FbConnection *fb_connection;
+	long isc_status[20];
 
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 	/* Check the first object type of the parameters */
@@ -1263,6 +1276,7 @@ static void fb_cursor_fetch_prep(struct FbCursor *fb_cursor)
 	long length;
 	long alignment;
 	long offset;
+	long isc_status[20];
 
 	fb_cursor_check(fb_cursor);
 
@@ -1329,6 +1343,8 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	ISC_LONG num_segments;
 	ISC_LONG total_length;
 
+	long isc_status[20];
+	
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 	fb_connection_check(fb_connection);
 
@@ -1490,6 +1506,8 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 	long cols;
 	long items;
 
+	long isc_status[20];
+	
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
@@ -1698,6 +1716,7 @@ static VALUE cursor_each(int argc, VALUE* argv, VALUE self)
 static VALUE cursor_close(VALUE self)
 {
 	struct FbCursor *fb_cursor;
+	long isc_status[20];
 
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 	fb_cursor_check(fb_cursor);
@@ -1955,6 +1974,7 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 
 static VALUE database_create(VALUE self)
 {
+	long isc_status[20];
 	isc_db_handle handle = 0;
 	isc_tr_handle transaction = 0;
 	VALUE parms, fmt, stmt;
@@ -1996,6 +2016,7 @@ static VALUE database_s_create(int argc, VALUE *argv, VALUE klass)
 
 static VALUE database_connect(VALUE self)
 {
+	long isc_status[20];
 	char *dbp;
 	int length;
 	isc_db_handle handle = NULL;
@@ -2025,6 +2046,7 @@ static VALUE database_s_connect(int argc, VALUE *argv, VALUE klass)
 
 static VALUE database_drop(VALUE self)
 {
+	long isc_status[20];
 	struct FbConnection *fb_connection;
 
 	VALUE connection = database_connect(self);
