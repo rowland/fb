@@ -1,7 +1,7 @@
  /*
   * fb.c
   * A module to access the Firebird database from Ruby.
-  * Fork of interbase.c to fb.c by Brent Rowland.  
+  * Fork of interbase.c to fb.c by Brent Rowland.
   * All changes, improvements and associated bugs Copyright (C) 2006 Brent Rowland and Target Training International.
   * License to all changes, improvements and bugs is granted under the same terms as the original and/or
   * the Ruby license, whichever is most applicable.
@@ -89,7 +89,6 @@ static struct FbConnection *fb_connection_list;
 struct FbCursor {
 	int open;
 	isc_stmt_handle stmt;
-	VALUE describe;
 	VALUE fields_ary;
 	VALUE fields_hash;
 	VALUE connection;
@@ -167,9 +166,32 @@ static VALUE fb_error_msg(long *isc_status)
 static VALUE fb_mktime(struct tm *tm)
 {
 	return rb_funcall(
-		rb_cTime, rb_intern("utc"), 6, 
+		rb_cTime, rb_intern("utc"), 6,
 		INT2FIX(tm->tm_year), INT2FIX(tm->tm_mon), INT2FIX(tm->tm_mday),
 		INT2FIX(tm->tm_hour), INT2FIX(tm->tm_min), INT2FIX(tm->tm_sec));
+}
+
+static VALUE fb_sql_type_from_code(int code)
+{
+	char *sql_type = NULL;
+	switch(code) {
+		case SQL_TEXT:		sql_type = "CHAR";		break;
+		case SQL_VARYING:	sql_type = "VARCHAR";	break;
+		case SQL_SHORT:		sql_type = "SMALLINT";	break;
+		case SQL_LONG:		sql_type = "INTEGER";	break;
+		case SQL_FLOAT:		sql_type = "FLOAT";		break;
+		case SQL_DOUBLE:	sql_type = "DOUBLE PRECISION"; break;
+		case SQL_D_FLOAT:	sql_type = "DOUBLE PRECISION"; break;
+		case SQL_TIMESTAMP:	sql_type = "TIMESTAMP";	break;
+		case SQL_BLOB:		sql_type = "BLOB";		break;
+		case SQL_ARRAY:		sql_type = "ARRAY";		break;
+		case SQL_QUAD:		sql_type = "DECIMAL";	break;
+		case SQL_TYPE_TIME:	sql_type = "TIME";		break;
+		case SQL_TYPE_DATE:	sql_type = "DATE";		break;
+		case SQL_INT64:		sql_type = "BIGINT";	break;
+		default:			sql_type = "UNKNOWN";	break;
+	}
+	return rb_str_new2(sql_type);
 }
 
 static void fb_error_check(long *isc_status)
@@ -185,7 +207,7 @@ static void fb_error_check(long *isc_status)
 		msg2 = fb_error_msg(isc_status);
 		msg = rb_str_cat(msg1, "\n", strlen("\n"));
 		msg = rb_str_concat(msg, msg2);
-		
+
 		exc = rb_exc_new3(rb_eFbError, msg);
 		rb_iv_set(exc, "error_code", INT2FIX(code));
 		rb_exc_raise(exc);
@@ -786,7 +808,6 @@ static VALUE connection_cursor(VALUE self)
 
 	c = Data_Make_Struct(rb_cFbCursor, struct FbCursor, fb_cursor_mark, fb_cursor_free, fb_cursor);
 	fb_cursor->connection = self;
-	fb_cursor->describe = Qnil;
 	fb_cursor->fields_ary = Qnil;
 	fb_cursor->fields_hash = Qnil;
 	fb_cursor->open = Qfalse;
@@ -801,7 +822,7 @@ static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
 {
 	VALUE cursor = connection_cursor(self);
 	VALUE val = cursor_execute(argc, argv, cursor);
-	
+
 	if (NIL_P(val)) {
 		if (rb_block_given_p()) {
 			return rb_ensure(rb_yield,cursor,cursor_close,cursor);
@@ -845,7 +866,7 @@ static VALUE connection_dialect(VALUE self)
 
 	Data_Get_Struct(self, struct FbConnection, fb_connection);
 	fb_connection_check(fb_connection);
-	
+
 	return INT2FIX(fb_connection->dialect);
 }
 
@@ -855,7 +876,7 @@ static VALUE connection_db_dialect(VALUE self)
 
 	Data_Get_Struct(self, struct FbConnection, fb_connection);
 	fb_connection_check(fb_connection);
-	
+
 	return INT2FIX(fb_connection->db_dialect);
 }
 
@@ -895,7 +916,6 @@ static void fb_cursor_drop_warn(struct FbCursor *fb_cursor)
 static void fb_cursor_mark(struct FbCursor *fb_cursor)
 {
 	rb_gc_mark(fb_cursor->connection);
-	rb_gc_mark(fb_cursor->describe);
 	rb_gc_mark(fb_cursor->fields_ary);
 	rb_gc_mark(fb_cursor->fields_hash);
 }
@@ -1153,64 +1173,6 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 	}
 }
 
-static VALUE fb_cursor_description(XSQLDA *sqlda)
-{
-	long cols;
-	long count;
-	VALUE ary;
-	XSQLVAR *var;
-	short dtp;
-
-	/* Check the number of result columns */
-	cols = sqlda->sqld;
-	if (cols == 0) {
-		return Qnil;
-	}
-
-	/* Create array */
-	ary = rb_ary_new();
-
-	/* Check the number of result columns */
-	for (count = 0; count < cols; count++) {
-		VALUE colary;
-		VALUE str;
-
-		colary = rb_ary_new();
-
-		var = &sqlda->sqlvar[count];
-		dtp = var->sqltype & ~1;
-
-		/* columns name */
-		str = rb_tainted_str_new(var->sqlname, var->sqlname_length);
-		rb_str_freeze(str);
-		rb_ary_push(colary, str);
-		/* type code */
-		rb_ary_push(colary, INT2NUM((long)(var->sqltype & ~1)));
-		/* display size */
-		rb_ary_push(colary, INT2NUM((long)var->sqllen));
-
-		/* internal size */
-		if (dtp == SQL_VARYING) {
-			rb_ary_push(colary, INT2NUM((long)var->sqllen + sizeof(short)));
-		} else {
-			rb_ary_push(colary, INT2NUM((long)var->sqllen));
-		}
-		/* precision */
-		rb_ary_push(colary, INT2FIX(0));
-
-		/* scale */
-		rb_ary_push(colary, INT2NUM((long)var->sqlscale));
-
-		/* null OK */
-		rb_ary_push(colary, (var->sqltype & 1)?Qtrue:Qfalse);
-
-		rb_ary_freeze(colary);
-		rb_ary_push(ary, colary);
-	}
-	rb_ary_freeze(ary);
-	return ary;
-}
-
 static VALUE fb_cursor_fields_ary(XSQLDA *sqlda)
 {
 	long cols;
@@ -1225,10 +1187,9 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda)
 	}
 
 	ary = rb_ary_new();
-
 	for (count = 0; count < cols; count++) {
 		VALUE field;
-		VALUE name, type_code, display_size, internal_size, precision, scale, nullable;
+		VALUE name, type_code, sql_type, display_size, internal_size, precision, scale, nullable;
 
 		var = &sqlda->sqlvar[count];
 		dtp = var->sqltype & ~1;
@@ -1236,6 +1197,7 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda)
 		name = rb_tainted_str_new(var->sqlname, var->sqlname_length);
 		rb_str_freeze(name);
 		type_code = INT2NUM((long)(var->sqltype & ~1));
+		sql_type = fb_sql_type_from_code(dtp);
 		display_size = INT2NUM((long)var->sqllen);
 		if (dtp == SQL_VARYING) {
 			internal_size = INT2NUM((long)var->sqllen + sizeof(short));
@@ -1246,7 +1208,7 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda)
 		scale = INT2NUM((long)var->sqlscale);
 		nullable = (var->sqltype & 1) ? Qtrue : Qfalse;
 
-		field = rb_struct_new(rb_sFbField, name, type_code, display_size, internal_size, precision, scale, nullable);
+		field = rb_struct_new(rb_sFbField, name, sql_type, display_size, internal_size, precision, scale, nullable, type_code);
 		rb_ary_push(ary, field);
 	}
 	rb_ary_freeze(ary);
@@ -1257,13 +1219,13 @@ static VALUE fb_cursor_fields_hash(VALUE fields_ary)
 {
 	int i;
 	VALUE hash = rb_hash_new();
-	
+
 	for (i = 0; i < RARRAY(fields_ary)->len; i++) {
 		VALUE field = rb_ary_entry(fields_ary, i);
 		VALUE name = rb_struct_aref(field, LONG2NUM(0));
 		rb_hash_aset(hash, name, field);
 	}
-	
+
 	return hash;
 }
 
@@ -1635,7 +1597,6 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 		}
 
 		/* Set the description attributes */
-		fb_cursor->describe = fb_cursor_description(o_sqlda);
 		fb_cursor->fields_ary = fb_cursor_fields_ary(o_sqlda);
 		fb_cursor->fields_hash = fb_cursor_fields_hash(fb_cursor->fields_ary);
 	}
@@ -1670,7 +1631,7 @@ static int hash_format(int argc, VALUE *argv)
 		return TRUE;
 	} else {
 		rb_raise(rb_eFbError, "Unknown format");
-	}		
+	}
 }
 
 static VALUE cursor_fetch(int argc, VALUE* argv, VALUE self)
@@ -1679,7 +1640,7 @@ static VALUE cursor_fetch(int argc, VALUE* argv, VALUE self)
 	struct FbCursor *fb_cursor;
 
 	int hash_row = hash_format(argc, argv);
-	
+
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 	fb_cursor_fetch_prep(fb_cursor);
 
@@ -1691,7 +1652,7 @@ static VALUE cursor_fetchall(int argc, VALUE* argv, VALUE self)
 {
 	VALUE ary, row;
 	struct FbCursor *fb_cursor;
-	
+
 	int hash_rows = hash_format(argc, argv);
 
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
@@ -1717,7 +1678,7 @@ static VALUE cursor_each(int argc, VALUE* argv, VALUE self)
 	struct FbCursor *fb_cursor;
 
 	int hash_rows = hash_format(argc, argv);
-	
+
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 	fb_cursor_fetch_prep(fb_cursor);
 
@@ -1747,7 +1708,6 @@ static VALUE cursor_close(VALUE self)
 		fb_error_check(isc_status);
 		fb_cursor->open = Qfalse;
 	}
-	fb_cursor->describe = Qnil;
 	fb_cursor->fields_ary = Qnil;
 	fb_cursor->fields_hash = Qnil;
 
@@ -1763,7 +1723,6 @@ static VALUE cursor_drop(VALUE self)
 
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 	fb_cursor_drop(fb_cursor);
-	fb_cursor->describe = Qnil;
 	fb_cursor->fields_ary = Qnil;
 	fb_cursor->fields_hash = Qnil;
 
@@ -1776,14 +1735,6 @@ static VALUE cursor_drop(VALUE self)
 	}
 
 	return Qnil;
-}
-
-static VALUE cursor_description(VALUE self)
-{
-	struct FbCursor *fb_cursor;
-
-	Data_Get_Struct(self, struct FbCursor, fb_cursor);
-	return fb_cursor->describe;
 }
 
 static VALUE cursor_fields(int argc, VALUE* argv, VALUE self)
@@ -1832,14 +1783,14 @@ static char* connection_create_dbp(VALUE self, int *length)
 {
 	char *dbp;
 	VALUE username, password, charset, role;
-	
+
 	username = rb_iv_get(self, "@username");
 	Check_Type(username, T_STRING);
 	password = rb_iv_get(self, "@password");
 	Check_Type(password, T_STRING);
 	role = rb_iv_get(self, "@role");
 	charset = rb_iv_get(self, "@charset");
-	
+
 	dbp = dbp_create(length);
 	dbp = dbp_add_string(dbp, isc_dpb_user_name, STR2CSTR(username), length);
 	dbp = dbp_add_string(dbp, isc_dpb_password, STR2CSTR(password), length);
@@ -1894,7 +1845,7 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	for (i = 0; parm = CONNECTION_PARMS[i]; i++) {
 		rb_iv_set(connection, parm, rb_iv_get(db, parm));
 	}
-	
+
 	return connection;
 }
 
@@ -1932,7 +1883,7 @@ static VALUE database_allocate_instance(VALUE klass)
 static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 {
 	VALUE parms, database;
-	
+
 	if (argc >= 1) {
 		parms = argv[0];
 		Check_Type(parms, T_HASH);
@@ -1961,7 +1912,7 @@ static VALUE database_create(VALUE self)
 	VALUE page_size = rb_iv_get(self, "@page_size");
 	VALUE charset = rb_iv_get(self, "@charset");
 	parms = rb_ary_new3(5, database, username, password, page_size, charset);
-		
+
 	fmt = rb_str_new2("CREATE DATABASE '%s' USER '%s' PASSWORD '%s' PAGE_SIZE = %d DEFAULT CHARACTER SET %s;");
 	stmt = rb_funcall(fmt, rb_intern("%"), 1, parms);
 	sql = StringValuePtr(stmt);
@@ -1978,7 +1929,7 @@ static VALUE database_create(VALUE self)
 			fb_error_check(isc_status);
 		}
 	}
-	
+
 	return self;
 }
 
@@ -2021,7 +1972,7 @@ static VALUE database_s_connect(int argc, VALUE *argv, VALUE klass)
 static VALUE database_drop(VALUE self)
 {
 	struct FbConnection *fb_connection;
-	
+
 	VALUE connection = database_connect(self);
 	Data_Get_Struct(connection, struct FbConnection, fb_connection);
 	isc_drop_database(isc_status, &fb_connection->db);
@@ -2070,7 +2021,6 @@ void Init_fb()
 
 	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
 	rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1);
-	rb_define_method(rb_cFbCursor, "description", cursor_description, 0);
 	rb_define_method(rb_cFbCursor, "fields", cursor_fields, -1);
 	rb_define_method(rb_cFbCursor, "fetch", cursor_fetch, -1);
 	rb_define_method(rb_cFbCursor, "fetchall", cursor_fetchall, -1);
@@ -2080,6 +2030,6 @@ void Init_fb()
 
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
 	rb_define_method(rb_eFbError, "error_code", error_error_code, 0);
-	
-	rb_sFbField = rb_struct_define("Field", "name", "type_code", "display_size", "internal_size", "precision", "scale", "nullable", NULL);
+
+	rb_sFbField = rb_struct_define("Field", "name", "sql_type", "display_size", "internal_size", "precision", "scale", "nullable", "type_code", NULL);
 }
