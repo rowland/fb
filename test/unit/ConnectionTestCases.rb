@@ -1,20 +1,12 @@
 require 'test/unit'
+require 'test/unit/FbTestCases'
 require 'fb.so'
 require 'fileutils'
 include Fb
 include FileUtils
 
 class ConnectionTestCases < Test::Unit::TestCase
-  def setup
-    @db_file = 'c:/var/fbdata/drivertest.fdb'
-    @parms = {
-      :database => "localhost:#{@db_file}",
-      :username => 'sysdba',
-      :password => 'masterkey',
-      :charset => 'NONE',
-      :role => 'READER' }
-    rm_rf @db_file
-  end
+  include FbTestCases
   
   def test_transaction
     Database.create(@parms) do |connection|

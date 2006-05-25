@@ -1,19 +1,16 @@
 require 'test/unit'
+require 'test/unit/FbTestCases'
 require 'fb.so'
 require 'fileutils'
 include Fb
 include FileUtils
 
 class DatabaseTestCases < Test::Unit::TestCase
+  include FbTestCases
+  
   def setup
-    @db_file = 'c:/var/fbdata/drivertest.fdb'
+    super
     @database = "localhost:#{@db_file}"
-    @parms = {
-      :database => "localhost:#{@db_file}",
-      :username => 'sysdba',
-      :password => 'masterkey',
-      :charset => 'NONE',
-      :role => 'READER' }
     @reader = {
       :database => "localhost:#{@db_file}",
       :username => 'rubytest',
@@ -26,7 +23,6 @@ class DatabaseTestCases < Test::Unit::TestCase
       :password => 'rubytest',
       :charset => 'NONE',
       :role => 'WRITER' }
-    rm_rf @db_file
   end
   
   def test_new
