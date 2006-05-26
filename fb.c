@@ -742,7 +742,11 @@ static void transaction_start(VALUE opt, int argc, VALUE *argv)
 	fb_error_check(isc_status);
 }
 
-/* transaction method */
+/* call-seq:
+ *   transaction(options, *connections) -> nil
+ *
+ * Start a (global) transaction.
+ */
 static VALUE global_transaction(int argc, VALUE *argv, VALUE self)
 {
 	VALUE opt = Qnil;
@@ -756,11 +760,21 @@ static VALUE global_transaction(int argc, VALUE *argv, VALUE self)
 	return Qnil;
 }
 
+/* call-seq:
+ *   transaction_started()? -> true or false
+ *
+ * Returns true if a transaction is currently active.
+ */
 static VALUE global_transaction_started()
 {
 	return transact ? Qtrue : Qfalse;
 }
 
+/* call-seq:
+ *   commit() -> nil
+ *
+ * Commit the current transaction.
+ */
 static VALUE global_commit()
 {
 	long isc_status[20];
@@ -773,6 +787,9 @@ static VALUE global_commit()
 	return Qnil;
 }
 
+/* call-seq:
+ *   rollback the current transaction.
+ */
 static VALUE global_rollback()
 {
 	long isc_status[20];
@@ -785,7 +802,12 @@ static VALUE global_rollback()
 	return Qnil;
 }
 
-/* connection methods */
+/*
+ * call-seq:
+ *   open? -> true or false
+ *
+ * Current connection status.
+ */
 
 static VALUE connection_is_open(VALUE self)
 {
@@ -795,6 +817,11 @@ static VALUE connection_is_open(VALUE self)
 	return (fb_connection->db == 0) ? Qfalse : Qtrue;
 }
 
+/* call-seq:
+ *   to_s
+ *
+ * Return current database connection string and either (OPEN) or (CLOSED).
+ */
 static VALUE connection_to_s(VALUE self)
 {
 	VALUE is_open = connection_is_open(self);
@@ -826,6 +853,10 @@ static VALUE connection_cursor(VALUE self)
 	return c;
 }
 
+/* call-seq:
+ *   execute(sql, *args) -> Cursor
+ *   execute(sql, *args) {|cursor| }
+ */
 static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
 {
 	VALUE cursor = connection_cursor(self);
@@ -841,6 +872,11 @@ static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
 	return Qnil;
 }
 
+/* call-seq:
+ *   close() -> nil
+ *
+ * Close connection.
+ */
 static VALUE connection_close(VALUE self)
 {
 	struct FbConnection *fb_connection;
@@ -856,6 +892,11 @@ static VALUE connection_close(VALUE self)
 	return Qnil;
 }
 
+/* call-seq:
+ *   drop() -> nil
+ *
+ * Drop connected database.
+ */
 static VALUE connection_drop(VALUE self)
 {
 	struct FbConnection *fb_connection;
@@ -868,6 +909,11 @@ static VALUE connection_drop(VALUE self)
 	return Qnil;
 }
 
+/* call-seq:
+ *   dialect() -> int
+ *
+ * Returns dialect of connection.
+ */
 static VALUE connection_dialect(VALUE self)
 {
 	struct FbConnection *fb_connection;
@@ -878,6 +924,11 @@ static VALUE connection_dialect(VALUE self)
 	return INT2FIX(fb_connection->dialect);
 }
 
+/* call-seq:
+ *   db_dialect() -> int
+ *
+ * Returns database dialect.
+ */
 static VALUE connection_db_dialect(VALUE self)
 {
 	struct FbConnection *fb_connection;
@@ -888,7 +939,6 @@ static VALUE connection_db_dialect(VALUE self)
 	return INT2FIX(fb_connection->db_dialect);
 }
 
-/* cursor utilities */
 static void fb_cursor_check(struct FbCursor *fb_cursor)
 {
 	if (fb_cursor->stmt == 0) {
@@ -1494,7 +1544,9 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	return ary;
 }
 
-/* cursor methods */
+/* call-seq:
+ *   execute(sql, *args)
+ */
 static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 {
 	struct FbCursor *fb_cursor;
@@ -1733,7 +1785,13 @@ static VALUE cursor_close(VALUE self)
 	return Qnil;
 }
 
-
+/* call-seq:
+ *   drop() -> nil
+ *
+ * Drop the cursor.
+ *
+ * TODO: How is this different from close()?
+ */
 static VALUE cursor_drop(VALUE self)
 {
 	struct FbCursor *fb_cursor;
@@ -1756,6 +1814,13 @@ static VALUE cursor_drop(VALUE self)
 	return Qnil;
 }
 
+/* call-seq:
+ *   fields() -> Array
+ *   fields(:array) -> Array
+ *   fields(:hash) -> Hash
+ *
+ * Return an array of Field Structs or a hash indexed by field name.
+ */
 static VALUE cursor_fields(int argc, VALUE* argv, VALUE self)
 {
 	struct FbCursor *fb_cursor;
@@ -1885,6 +1950,11 @@ static VALUE connection_names(VALUE self, char *sql)
 	return names;
 }
 
+/* call-seq:
+ *   table_names() -> array
+ *
+ * Returns sorted array of table names in connected database.
+ */
 static VALUE connection_table_names(VALUE self)
 {
 	char *sql = "SELECT RDB$RELATION_NAME FROM RDB$RELATIONS "
@@ -1893,6 +1963,11 @@ static VALUE connection_table_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+/* call-seq:
+ *   generator_names() -> array
+ *
+ * Returns sorted array of generator names in connected database.
+ */
 static VALUE connection_generator_names(VALUE self)
 {
 	char *sql = "SELECT RDB$GENERATOR_NAME FROM RDB$GENERATORS "
@@ -1901,6 +1976,11 @@ static VALUE connection_generator_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+/* call-seq:
+ *   view_names() -> array
+ *
+ * Returns sorted array of view names in connected database.
+ */
 static VALUE connection_view_names(VALUE self)
 {
 	char *sql = "SELECT RDB$RELATION_NAME, RDB$OWNER_NAME, RDB$VIEW_SOURCE FROM RDB$RELATIONS "
@@ -1909,12 +1989,22 @@ static VALUE connection_view_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+/* call-seq:
+ *   role_names() -> array
+ *
+ * Returns sorted array of role names in connected database.
+ */
 static VALUE connection_role_names(VALUE self)
 {
 	char *sql = "SELECT * FROM RDB$ROLES ORDER BY RDB$ROLE_NAME";
 	return connection_names(self, sql);
 }
 
+/* call-seq:
+ *   procedure_names() -> array
+ *
+ * Returns sorted array of stored procedure names in connected database.
+ */
 static VALUE connection_procedure_names(VALUE self)
 {
 	char *sql = "SELECT RDB$PROCEDURE_NAME FROM RDB$PROCEDURES "
@@ -1953,6 +2043,17 @@ static VALUE database_allocate_instance(VALUE klass)
     return (VALUE)obj;
 }
 
+/* call-seq:
+ *   Database.new(options) -> Database
+ *
+ * Initialize Database with Hash of values:
+ *   :database: Full Firebird connection string, e.g. 'localhost:/var/fbdata/drivertest.fdb' (required)
+ *   :username: database username (default: 'sysdba')
+ *   :password: database password (default: 'masterkey')
+ *   :charset: character set to be used with the connection (default: 'NONE')
+ *   :role: database role to connect using (default: nil)
+ *   :page_size: page size to use when creating a database (default: 1024)
+ */
 static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 {
 	VALUE parms, database;
@@ -1972,6 +2073,12 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 	return self;
 }
 
+/* call-seq:
+ *   create() -> Database
+ *   create() {|connection| } -> Database
+ *
+ * Create a database using the current database options.
+ */
 static VALUE database_create(VALUE self)
 {
 	long isc_status[20];
@@ -2007,6 +2114,12 @@ static VALUE database_create(VALUE self)
 	return self;
 }
 
+/* call-seq:
+ *   Database.create(options) -> Database
+ *   Database.create(options) {|connection| } -> Database
+ *
+ * Create a database using the specified options (see: Database.new for details of options Hash).
+ */
 static VALUE database_s_create(int argc, VALUE *argv, VALUE klass)
 {
 	VALUE obj = database_allocate_instance(klass);
@@ -2014,6 +2127,12 @@ static VALUE database_s_create(int argc, VALUE *argv, VALUE klass)
 	return database_create(obj);
 }
 
+/* call-seq:
+ *   connect() -> Connection
+ *   connect() {|connection| } -> nil
+ *
+ * Connect to the database specified by the current database options.
+ */
 static VALUE database_connect(VALUE self)
 {
 	long isc_status[20];
@@ -2037,6 +2156,12 @@ static VALUE database_connect(VALUE self)
 	}
 }
 
+/* call-seq:
+ *   Database.connect(options) -> Connection
+ *   Database.connect(options) {|connection| } -> nil
+ *
+ * Connect to a database using the options given (see: Database.new for details of options Hash).
+ */
 static VALUE database_s_connect(int argc, VALUE *argv, VALUE klass)
 {
 	VALUE obj = database_allocate_instance(klass);
@@ -2044,6 +2169,11 @@ static VALUE database_s_connect(int argc, VALUE *argv, VALUE klass)
 	return database_connect(obj);
 }
 
+/* call-seq:
+ *   drop() -> nil
+ *
+ * Drop the database specified by the current database options.
+ */
 static VALUE database_drop(VALUE self)
 {
 	long isc_status[20];
@@ -2057,6 +2187,11 @@ static VALUE database_drop(VALUE self)
 	return Qnil;
 }
 
+/* call-seq:
+ *   Database.drop(options) -> nil
+ *
+ * Drop the database specified by the options given (see: Database.new for details of options Hash).
+ */
 static VALUE database_s_drop(int argc, VALUE *argv, VALUE klass)
 {
 	VALUE obj = database_allocate_instance(klass);
@@ -2081,9 +2216,7 @@ void Init_fb()
 	rb_define_singleton_method(rb_cFbDatabase, "drop", database_s_drop, -1);
 
 	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
-    define_attrs(rb_cFbConnection, CONNECTION_PARMS);
-    rb_define_method(rb_cFbConnection, "to_s", connection_to_s, 0);
-	//rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0);
+	rb_define_method(rb_cFbConnection, "to_s", connection_to_s, 0);
 	rb_define_method(rb_cFbConnection, "execute", connection_execute, -1);
 	rb_define_method(rb_cFbConnection, "transaction", global_transaction, -1);
 	rb_define_method(rb_cFbConnection, "transaction_started", global_transaction_started, 0);
@@ -2099,9 +2232,11 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "view_names", connection_view_names, 0);
 	rb_define_method(rb_cFbConnection, "role_names", connection_role_names, 0);
 	rb_define_method(rb_cFbConnection, "procedure_names", connection_procedure_names, 0);
+	define_attrs(rb_cFbConnection, CONNECTION_PARMS);
+	//rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0);
 
 	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
-	rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1);
+	//rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1);
 	rb_define_method(rb_cFbCursor, "fields", cursor_fields, -1);
 	rb_define_method(rb_cFbCursor, "fetch", cursor_fetch, -1);
 	rb_define_method(rb_cFbCursor, "fetchall", cursor_fetchall, -1);
