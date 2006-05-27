@@ -53,8 +53,17 @@ class DatabaseTestCases < Test::Unit::TestCase
     assert_equal 'READER', db.role
   end
   
-  def test_initialize
+  def test_initialize_hash
     db = Database.new(@parms)
+    assert_equal @database, db.database
+    assert_equal 'sysdba', db.username
+    assert_equal 'masterkey', db.password
+    assert_equal 'NONE', db.charset
+    assert_equal 'READER', db.role
+  end
+  
+  def test_initialize_string
+    db = Database.new(@parms_s)
     assert_equal @database, db.database
     assert_equal 'sysdba', db.username
     assert_equal 'masterkey', db.password
@@ -104,7 +113,7 @@ class DatabaseTestCases < Test::Unit::TestCase
   
   def test_create_bad_param
     assert_raise TypeError do
-      db = Database.create('asdf')
+      db = Database.create(1)
     end
   end
 

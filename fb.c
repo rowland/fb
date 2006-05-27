@@ -2051,6 +2051,26 @@ static VALUE database_allocate_instance(VALUE klass)
     return (VALUE)obj;
 }
 
+static VALUE hash_from_connection_string(VALUE cs)
+{
+	VALUE hash = rb_hash_new();
+	VALUE re_SemiColon = rb_reg_regcomp(rb_str_new2("\\s*;\\s*"));
+	VALUE re_Equal = rb_reg_regcomp(rb_str_new2("\\s*=\\s*"));
+	ID id_split = rb_intern("split");
+	VALUE pairs = rb_funcall(cs, id_split, 1, re_SemiColon);
+	int i;
+	for (i = 0; i < RARRAY(pairs)->len; i++) {
+		VALUE pair = rb_ary_entry(pairs, i);
+		VALUE keyValue = rb_funcall(pair, id_split, 1, re_Equal);
+		if (RARRAY(keyValue)->len == 2) {
+			VALUE key = rb_ary_entry(keyValue, 0);
+			VALUE val = rb_ary_entry(keyValue, 1);
+			rb_hash_aset(hash, rb_str_intern(key), val);
+		}
+	}
+	return hash;
+}
+
 /* call-seq:
  *   Database.new(options) -> Database
  *
@@ -2068,7 +2088,11 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 
 	if (argc >= 1) {
 		parms = argv[0];
-		Check_Type(parms, T_HASH);
+		if (TYPE(parms) == T_STRING) {
+			parms = hash_from_connection_string(parms);
+		} else {
+			Check_Type(parms, T_HASH);
+		}
 		database = rb_hash_aref(parms, ID2SYM(rb_intern("database")));
 		if (NIL_P(database)) rb_raise(rb_eFbError, "Database must be specified.");
 		rb_iv_set(self, "@database", database);
