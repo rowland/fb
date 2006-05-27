@@ -1049,6 +1049,10 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(paramts + offset);
 					obj = rb_obj_as_string(obj);
+					if (RSTRING(obj)->len > var->sqllen) {
+						rb_raise(rb_eRangeError, "CHAR overflow: %d bytes exceeds %d byte(s) allowed.",
+							RSTRING(obj)->len, var->sqllen);
+					}
 					memcpy(var->sqldata, RSTRING(obj)->ptr, RSTRING(obj)->len);
 					var->sqllen = RSTRING(obj)->len;
 					offset += var->sqllen + 1;
@@ -1060,6 +1064,10 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					var->sqldata = (char *)(paramts + offset);
 					vary = (VARY *)var->sqldata;
 					obj = rb_obj_as_string(obj);
+					if (RSTRING(obj)->len > var->sqllen) {
+						rb_raise(rb_eRangeError, "VARCHAR overflow: %d bytes exceeds %d byte(s) allowed.",
+							RSTRING(obj)->len, var->sqllen);
+					}
 					memcpy(vary->vary_string, RSTRING(obj)->ptr, RSTRING(obj)->len);
 					vary->vary_length = RSTRING(obj)->len;
 					offset += vary->vary_length + sizeof(short);
@@ -1070,7 +1078,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					var->sqldata = (char *)(paramts + offset);
 					lvalue = NUM2LONG(obj);
 					if (lvalue < SHRT_MIN || lvalue > SHRT_MAX) {
-						rb_raise(rb_eIOError, "short integer overflow");
+						rb_raise(rb_eRangeError, "short integer overflow");
 					}
 					*(short *)var->sqldata = lvalue;
 					offset += alignment;
@@ -1094,7 +1102,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 						dcheck = dvalue * -1;
 					}
 					if (dcheck != 0.0 && (dcheck < FLT_MIN || dcheck > FLT_MAX)) {
-						rb_raise(rb_eIOError, "float overflow");
+						rb_raise(rb_eRangeError, "float overflow");
 					}
 					*(float *)var->sqldata = dvalue;
 					offset += alignment;
@@ -1178,7 +1186,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					offset += alignment;
 					break;
 					*/
-					rb_raise(rb_eIOError, "Arrays not supported");
+					rb_raise(rb_eArgError, "Arrays not supported");
 					break;
 #endif
 

@@ -174,4 +174,110 @@ class DataTypesTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
+
+  def test_insert_incorrect_types
+    cols = %w{ I SI BI F D C C10 VC VC10 VC10000 DT TM TS }
+    types = %w{ INTEGER SMALLINT BIGINT FLOAT DOUBLE\ PRECISION CHAR CHAR(10) VARCHAR(1) VARCHAR(10) VARCHAR(10000) DATE TIME TIMESTAMP }
+    sql_schema = "";
+    assert_equal cols.size, types.size
+    cols.size.times do |i|
+      sql_schema << "CREATE TABLE TEST_#{cols[i]} (VAL #{types[i]});\n"
+    end
+    Database.create(@parms) do |connection|
+      sql_schema.strip.split(';').each do |stmt|
+        connection.execute(stmt);
+      end
+      connection.commit;
+      cols.size.times do |i|
+        sql_insert = "INSERT INTO TEST_#{cols[i]} (VAL) VALUES (?);"
+        if cols[i] == 'I'
+          assert_raise TypeError do
+            connection.execute(sql_insert, "five")
+          end
+          assert_raise TypeError do
+            connection.execute(sql_insert, Time.now)
+          end
+          assert_raise RangeError do
+            connection.execute(sql_insert, 5000000000)
+          end
+        elsif cols[i] == 'SI'
+          assert_raise TypeError do
+            connection.execute(sql_insert, "five")
+          end
+          assert_raise TypeError do
+            connection.execute(sql_insert, Time.now)
+          end
+          assert_raise RangeError do
+            connection.execute(sql_insert, 100000)
+          end
+        elsif cols[i] == 'BI'
+          assert_raise TypeError do
+            connection.execute(sql_insert, "five")
+          end
+          assert_raise TypeError do
+            connection.execute(sql_insert, Time.now)
+          end
+          assert_raise RangeError do
+            connection.execute(sql_insert, 184467440737095516160) # 2^64 * 10
+          end
+        elsif cols[i] == 'F'
+          assert_raise TypeError do
+            connection.execute(sql_insert, "five")
+          end
+          assert_raise RangeError do
+            connection.execute(sql_insert, 10 ** 39)
+          end
+        elsif cols[i] == 'D'
+          assert_raise TypeError do
+            connection.execute(sql_insert, "five")
+          end
+        elsif cols[i] == 'VC'
+          assert_raise RangeError do
+            connection.execute(sql_insert, "too long")
+          end
+          assert_raise RangeError do
+            connection.execute(sql_insert, 1.0/3.0)
+          end
+        elsif cols[i] ==  'VC10'
+          assert_raise RangeError do
+            connection.execute(sql_insert, 1.0/3.0)
+          end
+        elsif cols[i].include?('VC10000')
+          assert_raise RangeError do
+            connection.execute(sql_insert, "X" * 10001)
+          end
+        elsif cols[i] == 'C'
+          assert_raise RangeError do
+            connection.execute(sql_insert, "too long")
+          end
+        elsif cols[i] == 'C10'
+          assert_raise RangeError do
+            connection.execute(sql_insert, Time.now)
+          end
+        elsif cols[i] == 'DT'
+          assert_raise TypeError do
+            connection.execute(sql_insert, "2006/1/1")
+          end
+          assert_raise TypeError do
+            connection.execute(sql_insert, 10000)
+          end
+        elsif cols[i] == 'TM'
+          assert_raise TypeError do
+            connection.execute(sql_insert, "2006/1/1")
+          end
+          assert_raise TypeError do
+            connection.execute(sql_insert, 10000)
+          end
+        elsif cols[i] ==  'TS'
+          assert_raise TypeError do
+            connection.execute(sql_insert, "2006/1/1")
+          end
+          assert_raise TypeError do
+            connection.execute(sql_insert, 10000)
+          end
+        end
+      end
+      connection.drop
+    end
+  end
 end
