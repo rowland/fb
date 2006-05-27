@@ -49,10 +49,10 @@ class ConnectionTestCases < Test::Unit::TestCase
       connection.commit
       connection.execute(sql_select) do |cursor|
         rows = cursor.fetchall
-        assert 10, rows.size
+        assert_equal 10, rows.size
         10.times do |i|
-          assert i, rows[i][0]
-          assert i.to_s, rows[i][1]
+          assert_equal i, rows[i][0]
+          assert_equal i.to_s, rows[i][1]
         end
       end
       connection.drop
@@ -72,7 +72,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       connection.rollback
       connection.execute(sql_select) do |cursor|
         rows = cursor.fetchall
-        assert 0, rows.size
+        assert_equal 0, rows.size
       end
       connection.drop
     end
