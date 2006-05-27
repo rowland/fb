@@ -2238,7 +2238,11 @@ void Init_fb()
 	rb_cFbDatabase = rb_define_class_under(rb_mFb, "Database", rb_cData);
     rb_define_alloc_func(rb_cFbDatabase, database_allocate_instance);
     rb_define_method(rb_cFbDatabase, "initialize", database_initialize, -1);
-    define_attrs(rb_cFbDatabase, CONNECTION_PARMS);
+	rb_define_attr(rb_cFbDatabase, "database", 1, 1);
+	rb_define_attr(rb_cFbDatabase, "username", 1, 1);
+	rb_define_attr(rb_cFbDatabase, "password", 1, 1);
+	rb_define_attr(rb_cFbDatabase, "charset", 1, 1);
+	rb_define_attr(rb_cFbDatabase, "role", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "page_size", 1, 1);
     rb_define_method(rb_cFbDatabase, "create", database_create, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "create", database_s_create, -1);
@@ -2248,6 +2252,11 @@ void Init_fb()
 	rb_define_singleton_method(rb_cFbDatabase, "drop", database_s_drop, -1);
 
 	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
+	rb_define_attr(rb_cFbConnection, "database", 1, 1);
+	rb_define_attr(rb_cFbConnection, "username", 1, 1);
+	rb_define_attr(rb_cFbConnection, "password", 1, 1);
+	rb_define_attr(rb_cFbConnection, "charset", 1, 1);
+	rb_define_attr(rb_cFbConnection, "role", 1, 1);
 	rb_define_method(rb_cFbConnection, "to_s", connection_to_s, 0);
 	rb_define_method(rb_cFbConnection, "execute", connection_execute, -1);
 	rb_define_method(rb_cFbConnection, "transaction", global_transaction, -1);
@@ -2264,7 +2273,6 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "view_names", connection_view_names, 0);
 	rb_define_method(rb_cFbConnection, "role_names", connection_role_names, 0);
 	rb_define_method(rb_cFbConnection, "procedure_names", connection_procedure_names, 0);
-	define_attrs(rb_cFbConnection, CONNECTION_PARMS);
 	//rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0);
 
 	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
