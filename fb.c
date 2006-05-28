@@ -170,16 +170,34 @@ static VALUE fb_mktime(struct tm *tm)
 		INT2FIX(tm->tm_hour), INT2FIX(tm->tm_min), INT2FIX(tm->tm_sec));
 }
 
-static VALUE fb_sql_type_from_code(int code)
+static VALUE fb_sql_type_from_code(int code, int subtype)
 {
 	char *sql_type = NULL;
 	switch(code) {
 		case SQL_TEXT:		sql_type = "CHAR";		break;
 		case SQL_VARYING:	sql_type = "VARCHAR";	break;
-		case SQL_SHORT:		sql_type = "SMALLINT";	break;
-		case SQL_LONG:		sql_type = "INTEGER";	break;
+		case SQL_SHORT:
+			switch (subtype) {
+				case 0:		sql_type = "SMALLINT";	break;
+				case 1:		sql_type = "NUMERIC";	break;
+				case 2:		sql_type = "DECIMAL";	break;
+			}
+			break;
+		case SQL_LONG:
+			switch (subtype) {
+				case 0:		sql_type = "INTEGER";	break;
+				case 1:		sql_type = "NUMERIC";	break;
+				case 2:		sql_type = "DECIMAL";	break;
+			}
+			break;
 		case SQL_FLOAT:		sql_type = "FLOAT";		break;
-		case SQL_DOUBLE:	sql_type = "DOUBLE PRECISION"; break;
+		case SQL_DOUBLE:
+			switch (subtype) {
+				case 0:		sql_type = "DOUBLE PRECISION"; break;
+				case 1:		sql_type = "NUMERIC";	break;
+				case 2:		sql_type = "DECIMAL";	break;
+			}
+			break;
 		case SQL_D_FLOAT:	sql_type = "DOUBLE PRECISION"; break;
 		case SQL_TIMESTAMP:	sql_type = "TIMESTAMP";	break;
 		case SQL_BLOB:		sql_type = "BLOB";		break;
@@ -187,7 +205,13 @@ static VALUE fb_sql_type_from_code(int code)
 		case SQL_QUAD:		sql_type = "DECIMAL";	break;
 		case SQL_TYPE_TIME:	sql_type = "TIME";		break;
 		case SQL_TYPE_DATE:	sql_type = "DATE";		break;
-		case SQL_INT64:		sql_type = "BIGINT";	break;
+		case SQL_INT64:
+			switch (subtype) {
+				case 0:		sql_type = "BIGINT";	break;
+				case 1:		sql_type = "NUMERIC";	break;
+				case 2:		sql_type = "DECIMAL";	break;
+			}
+			break;
 		default:			sql_type = "UNKNOWN";	break;
 	}
 	return rb_str_new2(sql_type);
@@ -1244,6 +1268,51 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 	}
 }
 
+static VALUE precision_from_sqlvar(XSQLVAR *sqlvar)
+{
+	switch(sqlvar->sqltype & ~1) {
+		case SQL_TEXT:		return Qnil;
+		case SQL_VARYING:	return Qnil;
+		case SQL_SHORT:
+			switch (sqlvar->sqlsubtype) {
+				case 0:		return INT2FIX(0);
+				case 1:		return INT2FIX(4);
+				case 2:		return INT2FIX(4);
+			}
+			break;
+		case SQL_LONG:
+			switch (sqlvar->sqlsubtype) {
+				case 0:		return INT2FIX(0);
+				case 1:		return INT2FIX(9);
+				case 2:		return INT2FIX(9);
+			}
+			break;
+		case SQL_FLOAT:		return Qnil;
+		case SQL_DOUBLE:
+		case SQL_D_FLOAT:
+			switch (sqlvar->sqlsubtype) {
+				case 0:		return Qnil;
+				case 1:		return INT2FIX(15);
+				case 2:		return INT2FIX(15);
+			}
+			break;
+		case SQL_TIMESTAMP:	return Qnil;
+		case SQL_BLOB:		return Qnil;
+		case SQL_ARRAY:		return Qnil;
+		case SQL_QUAD:		return Qnil;
+		case SQL_TYPE_TIME:	return Qnil;
+		case SQL_TYPE_DATE:	return Qnil;
+		case SQL_INT64:
+			switch (sqlvar->sqlsubtype) {
+				case 0:		return INT2FIX(0);
+				case 1:		return INT2FIX(18);
+				case 2:		return INT2FIX(18);
+			}
+			break;
+	}
+	return Qnil;
+}
+
 static VALUE fb_cursor_fields_ary(XSQLDA *sqlda)
 {
 	long cols;
@@ -1260,7 +1329,7 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda)
 	ary = rb_ary_new();
 	for (count = 0; count < cols; count++) {
 		VALUE field;
-		VALUE name, type_code, sql_type, display_size, internal_size, precision, scale, nullable;
+		VALUE name, type_code, sql_type, sql_subtype, display_size, internal_size, precision, scale, nullable;
 
 		var = &sqlda->sqlvar[count];
 		dtp = var->sqltype & ~1;
@@ -1268,18 +1337,19 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda)
 		name = rb_tainted_str_new(var->sqlname, var->sqlname_length);
 		rb_str_freeze(name);
 		type_code = INT2NUM((long)(var->sqltype & ~1));
-		sql_type = fb_sql_type_from_code(dtp);
+		sql_type = fb_sql_type_from_code(dtp, var->sqlsubtype);
+		sql_subtype = INT2FIX(var->sqlsubtype);
 		display_size = INT2NUM((long)var->sqllen);
 		if (dtp == SQL_VARYING) {
 			internal_size = INT2NUM((long)var->sqllen + sizeof(short));
 		} else {
 			internal_size = INT2NUM((long)var->sqllen);
 		}
-		precision = INT2FIX(0);
+		precision = precision_from_sqlvar(var);
 		scale = INT2NUM((long)var->sqlscale);
 		nullable = (var->sqltype & 1) ? Qtrue : Qfalse;
 
-		field = rb_struct_new(rb_sFbField, name, sql_type, display_size, internal_size, precision, scale, nullable, type_code);
+		field = rb_struct_new(rb_sFbField, name, sql_type, sql_subtype, display_size, internal_size, precision, scale, nullable, type_code);
 		rb_ary_push(ary, field);
 	}
 	rb_ary_freeze(ary);
@@ -2287,5 +2357,5 @@ void Init_fb()
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
 	rb_define_method(rb_eFbError, "error_code", error_error_code, 0);
 
-	rb_sFbField = rb_struct_define("Field", "name", "sql_type", "display_size", "internal_size", "precision", "scale", "nullable", "type_code", NULL);
+	rb_sFbField = rb_struct_define("Field", "name", "sql_type", "sql_subtype", "display_size", "internal_size", "precision", "scale", "nullable", "type_code", NULL);
 }
