@@ -47,6 +47,7 @@ static VALUE rb_mFb;
 static VALUE rb_cFbDatabase;
 static VALUE rb_cFbConnection;
 static VALUE rb_cFbCursor;
+static VALUE rb_cFbSqlType;
 static VALUE rb_eFbError;
 static VALUE rb_sFbField;
 
@@ -79,6 +80,7 @@ struct FbConnection {
 	VALUE cursor;
 	unsigned short dialect;
 	unsigned short db_dialect;
+	short downcase_column_names;
 	int dropped;
 	struct FbConnection *next;
 };
@@ -87,6 +89,7 @@ static struct FbConnection *fb_connection_list;
 
 struct FbCursor {
 	int open;
+	isc_tr_handle auto_transact;
 	isc_stmt_handle stmt;
 	VALUE fields_ary;
 	VALUE fields_hash;
@@ -174,9 +177,16 @@ static VALUE fb_sql_type_from_code(int code, int subtype)
 {
 	char *sql_type = NULL;
 	switch(code) {
-		case SQL_TEXT:		sql_type = "CHAR";		break;
-		case SQL_VARYING:	sql_type = "VARCHAR";	break;
+		case SQL_TEXT:
+		case blr_text:
+			sql_type = "CHAR";
+			break;
+		case SQL_VARYING:
+		case blr_varying:
+			sql_type = "VARCHAR";
+			break;
 		case SQL_SHORT:
+		case blr_short:
 			switch (subtype) {
 				case 0:		sql_type = "SMALLINT";	break;
 				case 1:		sql_type = "NUMERIC";	break;
@@ -184,35 +194,64 @@ static VALUE fb_sql_type_from_code(int code, int subtype)
 			}
 			break;
 		case SQL_LONG:
+		case blr_long:
 			switch (subtype) {
 				case 0:		sql_type = "INTEGER";	break;
 				case 1:		sql_type = "NUMERIC";	break;
 				case 2:		sql_type = "DECIMAL";	break;
 			}
 			break;
-		case SQL_FLOAT:		sql_type = "FLOAT";		break;
+		case SQL_FLOAT:
+		case blr_float:
+			sql_type = "FLOAT";
+			break;
 		case SQL_DOUBLE:
+		case blr_double:
 			switch (subtype) {
 				case 0:		sql_type = "DOUBLE PRECISION"; break;
 				case 1:		sql_type = "NUMERIC";	break;
 				case 2:		sql_type = "DECIMAL";	break;
 			}
 			break;
-		case SQL_D_FLOAT:	sql_type = "DOUBLE PRECISION"; break;
-		case SQL_TIMESTAMP:	sql_type = "TIMESTAMP";	break;
-		case SQL_BLOB:		sql_type = "BLOB";		break;
-		case SQL_ARRAY:		sql_type = "ARRAY";		break;
-		case SQL_QUAD:		sql_type = "DECIMAL";	break;
-		case SQL_TYPE_TIME:	sql_type = "TIME";		break;
-		case SQL_TYPE_DATE:	sql_type = "DATE";		break;
+		case SQL_D_FLOAT:
+		case blr_d_float:
+			sql_type = "DOUBLE PRECISION";
+			break;
+		case SQL_TIMESTAMP:
+		case blr_timestamp:
+			sql_type = "TIMESTAMP";
+			break;
+		case SQL_BLOB:
+		case blr_blob:
+			sql_type = "BLOB";
+			break;
+		case SQL_ARRAY:
+			sql_type = "ARRAY";
+			break;
+		case SQL_QUAD:
+		case blr_quad:
+			sql_type = "DECIMAL";
+			break;
+		case SQL_TYPE_TIME:
+		case blr_sql_time:
+			sql_type = "TIME";
+			break;
+		case SQL_TYPE_DATE:
+		case blr_sql_date:
+			sql_type = "DATE";
+			break;
 		case SQL_INT64:
+		case blr_int64:
 			switch (subtype) {
 				case 0:		sql_type = "BIGINT";	break;
 				case 1:		sql_type = "NUMERIC";	break;
 				case 2:		sql_type = "DECIMAL";	break;
 			}
 			break;
-		default:			sql_type = "UNKNOWN";	break;
+		default:
+			printf("Unknown: %d, %d\n", code, subtype);
+			sql_type = "UNKNOWN";
+			break;
 	}
 	return rb_str_new2(sql_type);
 }
@@ -781,7 +820,7 @@ static VALUE global_transaction(int argc, VALUE *argv, VALUE self)
 	}
 	transaction_start(opt, argc, argv);
 
-	return Qnil;
+	return Qtrue;
 }
 
 /* call-seq:
@@ -1313,17 +1352,25 @@ static VALUE precision_from_sqlvar(XSQLVAR *sqlvar)
 	return Qnil;
 }
 
-static VALUE fb_cursor_fields_ary(XSQLDA *sqlda)
+static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_column_names)
 {
 	long cols;
 	long count;
 	XSQLVAR *var;
 	short dtp;
 	VALUE ary;
+	VALUE re_lowercase;
+	ID id_matches, id_downcase_bang;
 
 	cols = sqlda->sqld;
 	if (cols == 0) {
 		return Qnil;
+	}
+
+	if (downcase_column_names) {
+		re_lowercase = rb_reg_regcomp(rb_str_new2("[[:lower:]]"));
+		id_matches = rb_intern("=~");
+		id_downcase_bang = rb_intern("downcase!");
 	}
 
 	ary = rb_ary_new();
@@ -1334,7 +1381,14 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda)
 		var = &sqlda->sqlvar[count];
 		dtp = var->sqltype & ~1;
 
-		name = rb_tainted_str_new(var->sqlname, var->sqlname_length);
+		if (var->aliasname_length) { /* aliasname always present? */
+			name = rb_tainted_str_new(var->aliasname, var->aliasname_length);
+		} else {
+			name = rb_tainted_str_new(var->sqlname, var->sqlname_length);
+		}
+		if (downcase_column_names && rb_funcall(re_lowercase, id_matches, 1, name) == Qnil) {
+			rb_funcall(name, id_downcase_bang, 0);
+		}
 		rb_str_freeze(name);
 		type_code = INT2NUM((long)(var->sqltype & ~1));
 		sql_type = fb_sql_type_from_code(dtp, var->sqlsubtype);
@@ -1656,6 +1710,7 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 	}
 	if (!transact) {
 		transaction_start(Qnil, 0, 0);
+		fb_cursor->auto_transact = transact;
 	}
 
 	/* Prepare query */
@@ -1714,6 +1769,11 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 			isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, 1, 0, 0);
 			fb_error_check(isc_status);
 		}
+		if (transact == fb_cursor->auto_transact) {
+			isc_commit_transaction(isc_status, &transact);
+			fb_error_check(isc_status);
+			fb_cursor->auto_transact = transact = 0;
+		}
 	} else {
 		/* Open cursor if the SQL statement is query */
 		/* Get the number of columns and reallocate the SQLDA */
@@ -1745,7 +1805,7 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 		}
 
 		/* Set the description attributes */
-		fb_cursor->fields_ary = fb_cursor_fields_ary(o_sqlda);
+		fb_cursor->fields_ary = fb_cursor_fields_ary(o_sqlda, fb_connection->downcase_column_names);
 		fb_cursor->fields_hash = fb_cursor_fields_hash(fb_cursor->fields_ary);
 	}
 	/* Set the return object */
@@ -1856,6 +1916,11 @@ static VALUE cursor_close(VALUE self)
 		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
 		fb_error_check(isc_status);
 		fb_cursor->open = Qfalse;
+		if (transact == fb_cursor->auto_transact) {
+			isc_commit_transaction(isc_status, &transact);
+			fb_error_check(isc_status);
+			fb_cursor->auto_transact = transact = 0;
+		}
 	}
 	fb_cursor->fields_ary = Qnil;
 	fb_cursor->fields_hash = Qnil;
@@ -1965,12 +2030,13 @@ static char* connection_create_dbp(VALUE self, int *length)
 	return dbp;
 }
 
-static char* CONNECTION_PARMS[6] = {
+static char* CONNECTION_PARMS[] = {
 	"@database",
 	"@username",
 	"@password",
 	"@charset",
 	"@role",
+	"@downcase_column_names",
 	(char *)0
 };
 
@@ -1978,6 +2044,7 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 {
 	unsigned short dialect;
 	unsigned short db_dialect;
+	VALUE downcase_column_names;
 	char *parm;
 	int i;
 	struct FbConnection *fb_connection;
@@ -2003,6 +2070,8 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 
 	fb_connection->dialect = dialect;
 	fb_connection->db_dialect = db_dialect;
+	downcase_column_names = rb_iv_get(db, "@downcase_column_names");
+	fb_connection->downcase_column_names = (downcase_column_names != Qnil && downcase_column_names != Qfalse);
 
 	for (i = 0; parm = CONNECTION_PARMS[i]; i++) {
 		rb_iv_set(connection, parm, rb_iv_get(db, parm));
@@ -2090,6 +2159,11 @@ static VALUE connection_procedure_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+static VALUE sql_type_from_code(VALUE self, VALUE code, VALUE subtype)
+{
+	return fb_sql_type_from_code(NUM2INT(code), NUM2INT(subtype));
+}
+
 static void define_attrs(VALUE klass, char **attrs)
 {
 	char *parm;
@@ -2170,6 +2244,7 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 		rb_iv_set(self, "@password", default_string(parms, "password", "masterkey"));
 		rb_iv_set(self, "@charset", default_string(parms, "charset", "NONE"));
 		rb_iv_set(self, "@role", rb_hash_aref(parms, ID2SYM(rb_intern("role"))));
+		rb_iv_set(self, "@downcase_column_names", rb_hash_aref(parms, ID2SYM(rb_intern("downcase_column_names"))));
 		rb_iv_set(self, "@page_size", default_int(parms, "page_size", 1024));
 	}
 	return self;
@@ -2313,6 +2388,7 @@ void Init_fb()
 	rb_define_attr(rb_cFbDatabase, "password", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "charset", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "role", 1, 1);
+	rb_define_attr(rb_cFbDatabase, "downcase_column_names", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "page_size", 1, 1);
     rb_define_method(rb_cFbDatabase, "create", database_create, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "create", database_s_create, -1);
@@ -2327,6 +2403,7 @@ void Init_fb()
 	rb_define_attr(rb_cFbConnection, "password", 1, 1);
 	rb_define_attr(rb_cFbConnection, "charset", 1, 1);
 	rb_define_attr(rb_cFbConnection, "role", 1, 1);
+	rb_define_attr(rb_cFbConnection, "downcase_column_names", 1, 1);
 	rb_define_method(rb_cFbConnection, "to_s", connection_to_s, 0);
 	rb_define_method(rb_cFbConnection, "execute", connection_execute, -1);
 	rb_define_method(rb_cFbConnection, "transaction", global_transaction, -1);
@@ -2354,6 +2431,9 @@ void Init_fb()
 	rb_define_method(rb_cFbCursor, "close", cursor_close, 0);
 	rb_define_method(rb_cFbCursor, "drop", cursor_drop, 0);
 
+	rb_cFbSqlType = rb_define_class_under(rb_mFb, "SqlType", rb_cData);
+	rb_define_singleton_method(rb_cFbSqlType, "from_code", sql_type_from_code, 2);
+	
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
 	rb_define_method(rb_eFbError, "error_code", error_error_code, 0);
 

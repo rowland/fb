@@ -76,6 +76,22 @@ class CursorTestCases < Test::Unit::TestCase
     end
   end
   
+  def test_fields_array_downcased
+    Database.create(@parms.merge(:downcase_column_names => true)) do |connection|
+      connection.execute("select * from rdb$database") do |cursor|
+        fields = cursor.fields
+        fields_ary = cursor.fields :array
+        assert_equal fields, fields_ary
+        assert_equal 4, fields.size
+        assert_equal "rdb$description", fields[0].name;
+        assert_equal "rdb$relation_id", fields[1].name;
+        assert_equal "rdb$security_class", fields[2].name;
+        assert_equal "rdb$character_set_name", fields[3].name;
+      end
+      connection.drop
+    end
+  end
+  
   def test_fields_hash
     Database.create(@parms) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -85,6 +101,20 @@ class CursorTestCases < Test::Unit::TestCase
         assert_equal 500, fields["RDB$RELATION_ID"].type_code
         assert_equal 452, fields["RDB$SECURITY_CLASS"].type_code
         assert_equal 452, fields["RDB$CHARACTER_SET_NAME"].type_code
+      end
+      connection.drop
+    end
+  end
+  
+  def test_fields_hash_downcased
+    Database.create(@parms.merge(:downcase_column_names => true)) do |connection|
+      connection.execute("select * from rdb$database") do |cursor|
+        fields = cursor.fields :hash
+        assert_equal 4, fields.size
+        assert_equal 520, fields["rdb$description"].type_code
+        assert_equal 500, fields["rdb$relation_id"].type_code
+        assert_equal 452, fields["rdb$security_class"].type_code
+        assert_equal 452, fields["rdb$character_set_name"].type_code
       end
       connection.drop
     end
@@ -141,6 +171,23 @@ class CursorTestCases < Test::Unit::TestCase
         assert_raise Error do
           r3 = cursor.fetch
         end
+      end
+      connection.drop
+    end
+  end
+  
+  def test_fetch_hash_with_aliased_fields
+    sql = "SELECT RDB$DESCRIPTION DES, RDB$RELATION_ID REL, RDB$SECURITY_CLASS SEC, RDB$CHARACTER_SET_NAME FROM RDB$DATABASE"
+    Database.create(@parms) do |connection|
+      connection.execute(sql) do |cursor|
+        assert_instance_of Cursor, cursor
+        row = cursor.fetch :hash
+        assert_instance_of Hash, row
+        assert_equal 4, row.size
+        assert row.keys.include?("DES"), "No field DES"
+        assert row.keys.include?("REL"), "No field REL"
+        assert row.keys.include?("SEC"), "No field SEC"
+        assert row.keys.include?("RDB$CHARACTER_SET_NAME"), "No field RDB$CHARACTER_SET_NAME"
       end
       connection.drop
     end
