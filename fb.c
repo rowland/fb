@@ -845,7 +845,6 @@ static VALUE global_commit()
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
 		fb_error_check(isc_status);
-		transact = 0;
 	}
 	return Qnil;
 }
@@ -860,7 +859,6 @@ static VALUE global_rollback()
 	if (transact) {
 		isc_rollback_transaction(isc_status, &transact);
 		fb_error_check(isc_status);
-		transact = 0;
 	}
 	return Qnil;
 }
@@ -1294,7 +1292,7 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 			fb_cursor_set_inputparams(fb_cursor, RARRAY(obj)->len, RARRAY(obj)->ptr);
 
 			/* Execute SQL statement */
-			isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, 1, i_sqlda, 0);
+			isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, SQLDA_VERSION1, i_sqlda, 0);
 			fb_error_check(isc_status);
 		}
 	} else {
@@ -1302,7 +1300,7 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 		fb_cursor_set_inputparams(fb_cursor, argc, argv);
 
 		/* Execute SQL statement */
-		isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, 1, i_sqlda, 0);
+		isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, SQLDA_VERSION1, i_sqlda, 0);
 		fb_error_check(isc_status);
 	}
 }
@@ -1766,13 +1764,13 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 		} else if (in_params) {
 			fb_cursor_check_inparams(fb_cursor, argc, argv, EXECF_EXECDML);
 		} else {
-			isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, 1, 0, 0);
+			isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, SQLDA_VERSION1, 0, 0);
 			fb_error_check(isc_status);
 		}
 		if (transact == fb_cursor->auto_transact) {
 			isc_commit_transaction(isc_status, &transact);
 			fb_error_check(isc_status);
-			fb_cursor->auto_transact = transact = 0;
+			fb_cursor->auto_transact = transact;
 		}
 	} else {
 		/* Open cursor if the SQL statement is query */
@@ -1791,9 +1789,7 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 		}
 
 		/* Open cursor */
-		isc_dsql_execute2(isc_status, &transact,
-				&fb_cursor->stmt, 1,
-				in_params ? i_sqlda : 0, 0);
+		isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, SQLDA_VERSION1, in_params ? i_sqlda : 0, 0);
 		fb_error_check(isc_status);
 		fb_cursor->open = Qtrue;
 
@@ -1919,7 +1915,7 @@ static VALUE cursor_close(VALUE self)
 		if (transact == fb_cursor->auto_transact) {
 			isc_commit_transaction(isc_status, &transact);
 			fb_error_check(isc_status);
-			fb_cursor->auto_transact = transact = 0;
+			fb_cursor->auto_transact = transact;
 		}
 	}
 	fb_cursor->fields_ary = Qnil;
