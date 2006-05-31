@@ -150,11 +150,11 @@ class ConnectionTestCases < Test::Unit::TestCase
       connection.execute(sql_schema);
       memo = IO.read("fb.c")
       assert memo.size > 50000
-      connection.transaction
-      10.times do |i|
-        connection.execute(sql_insert, i, i.to_s, memo);
+      connection.transaction do
+        10.times do |i|
+          connection.execute(sql_insert, i, i.to_s, memo);
+        end
       end
-      connection.commit
       connection.execute(sql_select) do |cursor|
         i = 0
         cursor.each :hash do |row|
@@ -179,11 +179,11 @@ class ConnectionTestCases < Test::Unit::TestCase
         f.read * 3
       end
       assert (attachment.size > 150000), "Not expected size"
-      connection.transaction
-      3.times do |i|
-        connection.execute(sql_insert, i, i.to_s, attachment);
+      connection.transaction do
+        3.times do |i|
+          connection.execute(sql_insert, i, i.to_s, attachment);
+        end
       end
-      connection.commit
       connection.execute(sql_select) do |cursor|
         i = 0
         cursor.each :array do |row|
@@ -274,11 +274,11 @@ class ConnectionTestCases < Test::Unit::TestCase
       create table test2 (id int);
     END
     Database.create(@parms) do |connection|
-      connection.transaction
-      sql_schema.strip.split(';').each do |stmt|
-        connection.execute(stmt);
+      connection.transaction do
+        sql_schema.strip.split(';').each do |stmt|
+          connection.execute(stmt);
+        end
       end
-      connection.commit
       table_names = connection.table_names
       assert_equal 'TEST1', table_names[0]
       assert_equal 'TEST2', table_names[1]
@@ -291,11 +291,11 @@ class ConnectionTestCases < Test::Unit::TestCase
       create generator test2_seq;
     END
     Database.create(@parms) do |connection|
-      connection.transaction
-      sql_schema.strip.split(';').each do |stmt|
-        connection.execute(stmt);
+      connection.transaction do
+        sql_schema.strip.split(';').each do |stmt|
+          connection.execute(stmt);
+        end
       end
-      connection.commit
       names = connection.generator_names
       assert_equal 'TEST1_SEQ', names[0]
       assert_equal 'TEST2_SEQ', names[1]
@@ -310,11 +310,11 @@ class ConnectionTestCases < Test::Unit::TestCase
       CREATE VIEW VIEW2 AS SELECT TEST2.ID, TEST1.NAME1, TEST2.NAME2 FROM TEST1 JOIN TEST2 ON TEST1.NAME1 = TEST2.NAME2;
     END
     Database.create(@parms) do |connection|
-      connection.transaction
-      sql_schema.strip.split(';').each do |stmt|
-        connection.execute(stmt);
+      connection.transaction do
+        sql_schema.strip.split(';').each do |stmt|
+          connection.execute(stmt);
+        end
       end
-      connection.commit
       names = connection.view_names
       assert_equal 'VIEW1', names[0]
       assert_equal 'VIEW2', names[1]
@@ -327,11 +327,11 @@ class ConnectionTestCases < Test::Unit::TestCase
       create role writer;
     END
     Database.create(@parms) do |connection|
-      connection.transaction
-      sql_schema.strip.split(';').each do |stmt|
-        connection.execute(stmt);
+      connection.transaction do
+        sql_schema.strip.split(';').each do |stmt|
+          connection.execute(stmt);
+        end
       end
-      connection.commit
       names = connection.role_names
       assert_equal 'READER', names[0]
       assert_equal 'WRITER', names[1]
