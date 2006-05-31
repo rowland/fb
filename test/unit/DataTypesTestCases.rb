@@ -86,16 +86,16 @@ class DataTypesTestCases < Test::Unit::TestCase
     sql_select = "select * from TEST order by I"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      connection.commit;
-      10.times do |i|
-        connection.execute(
-          sql_insert, 
-          gen_i(i), gen_si(i), gen_bi(i),
-          gen_f(i), gen_d(i),
-          gen_c(i), gen_c10(i), gen_vc(i), gen_vc10(i), gen_vc10000(i), 
-          gen_dt(i), gen_tm(i), gen_ts(i))
+      connection.transaction do
+        10.times do |i|
+          connection.execute(
+            sql_insert, 
+            gen_i(i), gen_si(i), gen_bi(i),
+            gen_f(i), gen_d(i),
+            gen_c(i), gen_c10(i), gen_vc(i), gen_vc10(i), gen_vc10000(i), 
+            gen_dt(i), gen_tm(i), gen_ts(i))
+        end
       end
-      connection.commit
       connection.execute(sql_select) do |cursor|
         i = 0
         cursor.each :hash do |row|
@@ -125,13 +125,13 @@ class DataTypesTestCases < Test::Unit::TestCase
     sql_select = "select * from test order by id"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      connection.commit;
       memo = IO.read("fb.c")
       assert memo.size > 50000
-      10.times do |i|
-        connection.execute(sql_insert, i, i.to_s, memo);
+      connection.transaction do
+        10.times do |i|
+          connection.execute(sql_insert, i, i.to_s, memo);
+        end
       end
-      connection.commit
       connection.execute(sql_select) do |cursor|
         i = 0
         cursor.each :hash do |row|
@@ -153,15 +153,15 @@ class DataTypesTestCases < Test::Unit::TestCase
     filename = "fb.c"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      connection.commit;
       attachment = File.open(filename,"rb") do |f|
         f.read * 3
       end
       assert (attachment.size > 150000), "Not expected size"
-      3.times do |i|
-        connection.execute(sql_insert, i, i.to_s, attachment);
+      connection.transaction do
+        3.times do |i|
+          connection.execute(sql_insert, i, i.to_s, attachment);
+        end
       end
-      connection.commit
       connection.execute(sql_select) do |cursor|
         i = 0
         cursor.each :array do |row|
@@ -184,10 +184,7 @@ class DataTypesTestCases < Test::Unit::TestCase
       sql_schema << "CREATE TABLE TEST_#{cols[i]} (VAL #{types[i]});\n"
     end
     Database.create(@parms) do |connection|
-      sql_schema.strip.split(';').each do |stmt|
-        connection.execute(stmt);
-      end
-      connection.commit;
+      connection.execute_script(sql_schema)
       cols.size.times do |i|
         sql_insert = "INSERT INTO TEST_#{cols[i]} (VAL) VALUES (?);"
         if cols[i] == 'I'

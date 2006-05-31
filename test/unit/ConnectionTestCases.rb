@@ -274,11 +274,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       create table test2 (id int);
     END
     Database.create(@parms) do |connection|
-      connection.transaction do
-        sql_schema.strip.split(';').each do |stmt|
-          connection.execute(stmt);
-        end
-      end
+      connection.execute_script(sql_schema)
       table_names = connection.table_names
       assert_equal 'TEST1', table_names[0]
       assert_equal 'TEST2', table_names[1]
@@ -291,11 +287,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       create generator test2_seq;
     END
     Database.create(@parms) do |connection|
-      connection.transaction do
-        sql_schema.strip.split(';').each do |stmt|
-          connection.execute(stmt);
-        end
-      end
+      connection.execute_script(sql_schema)
       names = connection.generator_names
       assert_equal 'TEST1_SEQ', names[0]
       assert_equal 'TEST2_SEQ', names[1]
@@ -310,11 +302,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       CREATE VIEW VIEW2 AS SELECT TEST2.ID, TEST1.NAME1, TEST2.NAME2 FROM TEST1 JOIN TEST2 ON TEST1.NAME1 = TEST2.NAME2;
     END
     Database.create(@parms) do |connection|
-      connection.transaction do
-        sql_schema.strip.split(';').each do |stmt|
-          connection.execute(stmt);
-        end
-      end
+      connection.execute_script(sql_schema)
       names = connection.view_names
       assert_equal 'VIEW1', names[0]
       assert_equal 'VIEW2', names[1]
@@ -327,11 +315,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       create role writer;
     END
     Database.create(@parms) do |connection|
-      connection.transaction do
-        sql_schema.strip.split(';').each do |stmt|
-          connection.execute(stmt);
-        end
-      end
+      connection.execute_script(sql_schema)
       names = connection.role_names
       assert_equal 'READER', names[0]
       assert_equal 'WRITER', names[1]

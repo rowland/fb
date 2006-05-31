@@ -12,3 +12,15 @@ module FbTestCases
     rm_rf @db_file
   end
 end
+
+require 'fb'
+
+class Fb::Connection
+  def execute_script(sql_schema)
+    self.transaction do
+      sql_schema.strip.split(';').each do |stmt|
+        self.execute(stmt);
+      end
+    end
+  end
+end
