@@ -25,10 +25,12 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
   
   def test_execute
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_select = "SELECT * FROM RDB$DATABASE"
     Database.create(@parms) do |connection|
       assert !connection.transaction_started
-      connection.execute("create table test (id int, name varchar(20));");
-      #connection.execute("select * from rdb$database;");
+      connection.execute(sql_schema)
+      connection.execute(sql_select)
       assert connection.transaction_started
       connection.commit
       assert !connection.transaction_started
@@ -37,12 +39,12 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
   
   def test_insert_commit
-    sql_schema = "create table test (id int, name varchar(20))"
-    sql_insert = "insert into test (id, name) values (?, ?)"
-    sql_select = "select * from test order by id"
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      connection.commit;
+      connection.transaction
       10.times do |i|
         connection.execute(sql_insert, i, i.to_s);
       end
@@ -60,33 +62,31 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
   
   def test_insert_rollback
-    sql_schema = "create table test (id int, name varchar(20))"
-    sql_insert = "insert into test (id, name) values (?, ?)"
-    sql_select = "select * from test order by id"
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
     Database.create(@parms) do |connection|
-      connection.execute(sql_schema);
-      connection.commit;
+      connection.execute(sql_schema)
+      connection.transaction
       10.times do |i|
         connection.execute(sql_insert, i, i.to_s);
       end
       connection.rollback
-      connection.execute(sql_select) do |cursor|
-        rows = cursor.fetchall
-        assert_equal 0, rows.size
-      end
+      rows = connection.execute(sql_select) do |cursor| cursor.fetchall end
+      assert_equal 0, rows.size
       connection.drop
     end
   end
   
   def test_insert_blobs_text
-    sql_schema = "create table test (id int, name varchar(20), memo blob sub_type text)"
-    sql_insert = "insert into test (id, name, memo) values (?, ?, ?)"
-    sql_select = "select * from test order by id"
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20), MEMO BLOB SUB_TYPE TEXT)"
+    sql_insert = "INSERT INTO TEST (ID, NAME, MEMO) VALUES (?, ?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      connection.commit;
       memo = IO.read("fb.c")
       assert memo.size > 50000
+      connection.transaction
       10.times do |i|
         connection.execute(sql_insert, i, i.to_s, memo);
       end
@@ -105,18 +105,17 @@ class ConnectionTestCases < Test::Unit::TestCase
   end
 
   def test_insert_blobs_binary
-    sql_schema = "create table test (id int, name varchar(20), attachment blob segment size 1000)"
-    sql_insert = "insert into test (id, name, attachment) values (?, ?, ?)"
-    sql_select = "select * from test order by id"
-    #filename = "data.dat"
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20), ATTACHMENT BLOB SEGMENT SIZE 1000)"
+    sql_insert = "INSERT INTO TEST (ID, NAME, ATTACHMENT) VALUES (?, ?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
     filename = "fb.c"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      connection.commit;
       attachment = File.open(filename,"rb") do |f|
         f.read * 3
       end
       assert (attachment.size > 150000), "Not expected size"
+      connection.transaction
       3.times do |i|
         connection.execute(sql_insert, i, i.to_s, attachment);
       end
@@ -211,6 +210,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       create table test2 (id int);
     END
     Database.create(@parms) do |connection|
+      connection.transaction
       sql_schema.strip.split(';').each do |stmt|
         connection.execute(stmt);
       end
@@ -227,6 +227,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       create generator test2_seq;
     END
     Database.create(@parms) do |connection|
+      connection.transaction
       sql_schema.strip.split(';').each do |stmt|
         connection.execute(stmt);
       end
@@ -239,12 +240,13 @@ class ConnectionTestCases < Test::Unit::TestCase
 
   def test_view_names
     sql_schema = <<-END
-      create table test1 (id int, name1 varchar(10));
-      create table test2 (id int, name2 varchar(10));
-      create view view1 as select test1.id, test1.name1, test2.name2 from test1 join test2 on test1.id = test2.id;
-      create view view2 as select test2.id, test1.name1, test2.name2 from test1 join test2 on test1.name1 = test2.name2;
+      CREATE TABLE TEST1 (ID INT, NAME1 VARCHAR(10));
+      CREATE TABLE TEST2 (ID INT, NAME2 VARCHAR(10));
+      CREATE VIEW VIEW1 AS SELECT TEST1.ID, TEST1.NAME1, TEST2.NAME2 FROM TEST1 JOIN TEST2 ON TEST1.ID = TEST2.ID;
+      CREATE VIEW VIEW2 AS SELECT TEST2.ID, TEST1.NAME1, TEST2.NAME2 FROM TEST1 JOIN TEST2 ON TEST1.NAME1 = TEST2.NAME2;
     END
     Database.create(@parms) do |connection|
+      connection.transaction
       sql_schema.strip.split(';').each do |stmt|
         connection.execute(stmt);
       end
@@ -261,6 +263,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       create role writer;
     END
     Database.create(@parms) do |connection|
+      connection.transaction
       sql_schema.strip.split(';').each do |stmt|
         connection.execute(stmt);
       end
@@ -281,7 +284,6 @@ class ConnectionTestCases < Test::Unit::TestCase
     END_SQL
     Database.create(@parms) do |connection|
       connection.execute(sql_schema)
-      connection.commit
       names = connection.procedure_names
       assert_equal 'PLUSONE', names[0]
     end
