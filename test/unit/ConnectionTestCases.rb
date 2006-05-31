@@ -24,6 +24,25 @@ class ConnectionTestCases < Test::Unit::TestCase
     end
   end
   
+  def test_transaction_block
+    Database.create(@parms) do |connection|
+      n = 0
+      assert !connection.transaction_started
+      connection.transaction do
+        assert connection.transaction_started
+      end
+      assert !connection.transaction_started
+      assert_raise RuntimeError do
+        connection.transaction do
+          assert connection.transaction_started
+          raise "generic exception"
+        end
+      end
+      assert !connection.transaction_started
+      connection.drop
+    end
+  end
+  
   def test_execute
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_select = "SELECT * FROM RDB$DATABASE"
@@ -72,6 +91,51 @@ class ConnectionTestCases < Test::Unit::TestCase
         connection.execute(sql_insert, i, i.to_s);
       end
       connection.rollback
+      rows = connection.execute(sql_select) do |cursor| cursor.fetchall end
+      assert_equal 0, rows.size
+      connection.drop
+    end
+  end
+  
+  def test_transaction_block_insert_commit
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema);
+      assert !connection.transaction_started
+      result = connection.transaction do
+        assert connection.transaction_started
+        10.times do |i|
+          connection.execute(sql_insert, i, i.to_s);
+        end
+        assert connection.transaction_started
+        "transaction block result"
+      end
+      assert_equal "transaction block result", result
+      assert !connection.transaction_started
+      connection.execute(sql_select) do |cursor|
+        assert_equal 10, cursor.fetchall.size
+      end
+      connection.drop
+    end
+  end
+  
+  def test_transaction_block_insert_rollback
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema)
+      assert !connection.transaction_started
+      assert_raise RuntimeError do
+        connection.transaction do
+          10.times do |i|
+            connection.execute(sql_insert, i, i.to_s);
+          end
+          raise "Raise an exception, causing the transaction to be rolled back."
+        end
+      end
       rows = connection.execute(sql_select) do |cursor| cursor.fetchall end
       assert_equal 0, rows.size
       connection.drop

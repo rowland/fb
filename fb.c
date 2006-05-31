@@ -806,34 +806,6 @@ static void transaction_start(VALUE opt, int argc, VALUE *argv)
 }
 
 /* call-seq:
- *   transaction(options, *connections) -> nil
- *
- * Start a (global) transaction.
- */
-static VALUE global_transaction(int argc, VALUE *argv, VALUE self)
-{
-	VALUE opt = Qnil;
-
-	if (argc > 0) {
-		opt = *argv++;
-		argc--;
-	}
-	transaction_start(opt, argc, argv);
-
-	return Qtrue;
-}
-
-/* call-seq:
- *   transaction_started()? -> true or false
- *
- * Returns true if a transaction is currently active.
- */
-static VALUE global_transaction_started()
-{
-	return transact ? Qtrue : Qfalse;
-}
-
-/* call-seq:
  *   commit() -> nil
  *
  * Commit the current transaction.
@@ -861,6 +833,46 @@ static VALUE global_rollback()
 		fb_error_check(isc_status);
 	}
 	return Qnil;
+}
+
+/* call-seq:
+ *   transaction(options, *connections) -> nil
+ *
+ * Start a (global) transaction.
+ */
+static VALUE global_transaction(int argc, VALUE *argv, VALUE self)
+{
+	VALUE opt = Qnil;
+
+	if (argc > 0) {
+		opt = *argv++;
+		argc--;
+	}
+	transaction_start(opt, argc, argv);
+
+	if (rb_block_given_p()) {
+		int state;
+		VALUE result = rb_protect(rb_yield, 0, &state);
+		if (state) {
+			global_rollback();
+			return rb_funcall(rb_mKernel, rb_intern("raise"), 0);
+		} else {
+			global_commit();
+			return result;
+		}
+	} else {
+		return Qtrue;
+   	}
+}
+
+/* call-seq:
+ *   transaction_started()? -> true or false
+ *
+ * Returns true if a transaction is currently active.
+ */
+static VALUE global_transaction_started()
+{
+	return transact ? Qtrue : Qfalse;
 }
 
 /*
