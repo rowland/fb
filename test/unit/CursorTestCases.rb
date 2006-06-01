@@ -1,9 +1,7 @@
 require 'test/unit'
 require 'test/unit/FbTestCases'
 require 'fb.so'
-require 'fileutils'
 include Fb
-include FileUtils
 
 class CursorTestCases < Test::Unit::TestCase
   include FbTestCases
@@ -19,7 +17,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_fetch_hash
     Database.create(@parms) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -31,7 +29,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_fetch_all_array
     Database.create(@parms) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -45,7 +43,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_fetch_all_hash
     Database.create(@parms) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -59,7 +57,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_fields_array
     Database.create(@parms) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -75,7 +73,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_fields_array_downcased
     Database.create(@parms.merge(:downcase_column_names => true)) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -91,7 +89,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_fields_hash
     Database.create(@parms) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -105,7 +103,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_fields_hash_downcased
     Database.create(@parms.merge(:downcase_column_names => true)) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -119,7 +117,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_each_array
     Database.create(@parms) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -134,7 +132,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_each_hash
     Database.create(@parms) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -149,7 +147,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_fetch_after_nil
     Database.create(@parms) do |connection|
       connection.execute("create generator test_seq");
@@ -174,7 +172,7 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_fetch_hash_with_aliased_fields
     sql = "SELECT RDB$DESCRIPTION DES, RDB$RELATION_ID REL, RDB$SECURITY_CLASS SEC, RDB$CHARACTER_SET_NAME FROM RDB$DATABASE"
     Database.create(@parms) do |connection|

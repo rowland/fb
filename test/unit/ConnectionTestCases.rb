@@ -1,9 +1,7 @@
 require 'test/unit'
 require 'test/unit/FbTestCases'
 require 'fb.so'
-require 'fileutils'
 include Fb
-include FileUtils
 
 class ConnectionTestCases < Test::Unit::TestCase
   include FbTestCases

@@ -1,3 +1,6 @@
+require 'fileutils'
+include FileUtils
+
 module FbTestCases
   def setup
     @db_file = (RUBY_PLATFORM =~ /win32/) ? 'c:/var/fbdata/drivertest.fdb' : '/var/fbdata/drivertest.fdb'
