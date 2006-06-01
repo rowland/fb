@@ -362,7 +362,7 @@ static void fb_connection_remove(struct FbConnection *fb_connection)
 static void fb_connection_disconnect(struct FbConnection *fb_connection)
 {
 	long isc_status[20];
-	
+
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
 		fb_error_check(isc_status);
@@ -379,7 +379,7 @@ static void fb_connection_disconnect(struct FbConnection *fb_connection)
 static void fb_connection_disconnect_warn(struct FbConnection *fb_connection)
 {
 	long isc_status[20];
-	
+
 	if (transact) {
 		isc_commit_transaction(isc_status, &transact);
 		fb_error_check_warn(isc_status);
@@ -1095,7 +1095,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 	struct time_object *tobj;
 
 	long isc_status[20];
-	
+
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 
 	/* Check the number of parameters */
@@ -1536,7 +1536,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	ISC_LONG total_length;
 
 	long isc_status[20];
-	
+
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 	fb_connection_check(fb_connection);
 
@@ -1686,10 +1686,12 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	return ary;
 }
 
+
 /* call-seq:
  *   execute(sql, *args)
  */
-static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
+//static VALUE cursor_execute2(int argc, VALUE* argv, VALUE self)
+static VALUE cursor_execute2(VALUE args)
 {
 	struct FbCursor *fb_cursor;
 	struct FbConnection *fb_connection;
@@ -1699,29 +1701,13 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 	long in_params;
 	long cols;
 	long items;
-
 	long isc_status[20];
-	
+
+	VALUE self = rb_ary_pop(args);
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
-
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
-	fb_connection_check(fb_connection);
 
-	if (argc < 1) {
-		rb_raise(rb_eArgError, "too few arguments (at least 1)");
-	}
-	sql = STR2CSTR(*argv);
-	argc--; argv++;
-
-	if (fb_cursor->open) {
-		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
-		fb_error_check(isc_status);
-		fb_cursor->open = Qfalse;
-	}
-	if (!transact) {
-		transaction_start(Qnil, 0, 0);
-		fb_cursor->auto_transact = transact;
-	}
+	sql = STR2CSTR(rb_ary_shift(args));
 
 	/* Prepare query */
 	isc_dsql_prepare(isc_status, &transact, &fb_cursor->stmt, 0, sql, fb_connection_dialect(fb_connection), o_sqlda);
@@ -1774,7 +1760,7 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 		} else if (statement == isc_info_sql_stmt_rollback) {
 			rb_raise(rb_eFbError, "use Fb::Connection#rollback()");
 		} else if (in_params) {
-			fb_cursor_check_inparams(fb_cursor, argc, argv, EXECF_EXECDML);
+			fb_cursor_execute_withparams(fb_cursor, RARRAY(args)->len, RARRAY(args)->ptr);
 		} else {
 			isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, SQLDA_VERSION1, 0, 0);
 			fb_error_check(isc_status);
@@ -1797,7 +1783,7 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 		}
 
 		if (in_params) {
-			fb_cursor_check_inparams(fb_cursor, argc, argv, EXECF_SETPARM);
+			fb_cursor_set_inputparams(fb_cursor, RARRAY(args)->len, RARRAY(args)->ptr);
 		}
 
 		/* Open cursor */
@@ -1824,6 +1810,52 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 		return INT2NUM(STATEMENT_DDL);
 	}
 	return INT2NUM(STATEMENT_DML);
+}
+
+static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
+{
+	struct FbCursor *fb_cursor;
+	struct FbConnection *fb_connection;
+	long isc_status[20];
+	VALUE args;
+
+	if (argc < 1) {
+		rb_raise(rb_eArgError, "At least 1 argument required.");
+	}
+
+	args = rb_ary_new4(argc, argv);
+	rb_ary_push(args, self);
+
+	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	fb_connection_check(fb_connection);
+
+	if (fb_cursor->open) {
+		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
+		fb_error_check(isc_status);
+		fb_cursor->open = Qfalse;
+	}
+
+	if (!transact) {
+		VALUE result;
+		int state;
+
+		transaction_start(Qnil, 0, 0);
+		fb_cursor->auto_transact = transact;
+
+		result = rb_protect(cursor_execute2, args, &state);
+		if (state) {
+			global_rollback();
+			return rb_funcall(rb_mKernel, rb_intern("raise"), 0);
+		} else if (result != Qnil) {
+			global_commit();
+			return result;
+		} else {
+			return result;
+		}
+	} else {
+		return cursor_execute2(args);
+	}
 }
 
 static VALUE fb_hash_from_ary(VALUE fields, VALUE row)
@@ -2095,7 +2127,7 @@ static VALUE connection_names(VALUE self, char *sql)
 	VALUE cursor = connection_execute(1, &query, self);
 	VALUE names = rb_ary_new();
 	ID id_rstrip_bang = rb_intern("rstrip!");
-	
+
 	while ((row = cursor_fetch(0, NULL, cursor)) != Qnil) {
 		VALUE name = rb_ary_entry(row, 0);
 		rb_ary_push(names, rb_funcall(name, id_rstrip_bang, 0));
@@ -2441,7 +2473,7 @@ void Init_fb()
 
 	rb_cFbSqlType = rb_define_class_under(rb_mFb, "SqlType", rb_cData);
 	rb_define_singleton_method(rb_cFbSqlType, "from_code", sql_type_from_code, 2);
-	
+
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
 	rb_define_method(rb_eFbError, "error_code", error_error_code, 0);
 

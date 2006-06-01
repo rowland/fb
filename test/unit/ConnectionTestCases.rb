@@ -57,6 +57,37 @@ class ConnectionTestCases < Test::Unit::TestCase
     end
   end
   
+  def test_auto_transaction_select_with_exception
+    sql_select = "SELECT * FROM RDB$DATABASE"
+    Database.create(@parms) do |connection|
+      assert !connection.transaction_started
+      assert_raise RuntimeError do
+        connection.execute(sql_select) do |cursor|
+          assert connection.transaction_started
+          raise "abort"
+        end
+      end
+      assert !connection.transaction_started
+      connection.drop
+    end
+  end
+  
+  def test_auto_transaction_insert_with_exception
+    sql_schema = "CREATE TABLE TEST (ID INT NOT NULL PRIMARY KEY, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema)
+      assert !connection.transaction_started
+      connection.execute(sql_insert, 1, "one")
+      assert !connection.transaction_started
+      assert_raise Error do
+        connection.execute(sql_insert, 1, "two")
+      end
+      assert !connection.transaction_started, "transaction is active"
+      connection.drop
+    end
+  end
+  
   def test_insert_commit
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
