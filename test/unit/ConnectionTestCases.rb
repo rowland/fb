@@ -75,6 +75,29 @@ class ConnectionTestCases < Test::Unit::TestCase
     end
   end
 
+  def test_rows_affected
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_update = "UPDATE TEST SET NAME = 'no name' WHERE ID < ?"
+    sql_delete = "DELETE FROM TEST WHERE ID > ?"
+    sql_select = "SELECT * FROM TEST"
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema)
+      connection.transaction do
+        10.times do |i|
+          affected = connection.execute(sql_insert, i, "name");
+          assert_equal 1, affected
+        end
+      end
+      affected = connection.execute(sql_update, 5)
+      assert_equal 5, affected
+      affected = connection.execute(sql_delete, 5)
+      assert 4, affected
+      rows = connection.execute(sql_select) do |cursor| cursor.fetchall end
+      assert 6, rows.size
+    end
+  end
+
   def test_dialects
     db = Database.create(@parms) do |connection|
       assert_equal 3, connection.dialect

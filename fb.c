@@ -942,7 +942,7 @@ static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
 			return cursor;
    		}
 	}
-	return Qnil;
+	return val;
 }
 
 /* call-seq:
@@ -1686,11 +1686,50 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	return ary;
 }
 
+static long cursor_rows_affected(struct FbCursor *fb_cursor, long statement_type)
+{
+	long inserted = 0, selected = 0, updated = 0, deleted = 0;
+	char request[] = { isc_info_sql_records };
+	char response[64], *r;
+	long isc_status[20];
+	
+	isc_dsql_sql_info(isc_status, &fb_cursor->stmt, sizeof(request), request, sizeof(response), response);
+	fb_error_check(isc_status);
+	if (response[0] != isc_info_sql_records) { return -1; }
+
+	r = response + 3; /* skip past first cluster */
+	while (*r != isc_info_end) {
+		char count_type = *r++;
+		short len = isc_vax_integer(r, sizeof(short));
+		r += sizeof(short);
+		switch (count_type) {
+			case isc_info_req_insert_count:
+				inserted = isc_vax_integer(r, len);
+				break;
+			case isc_info_req_select_count:
+				selected = isc_vax_integer(r, len);
+				break;
+			case isc_info_req_update_count:
+				updated = isc_vax_integer(r, len);
+				break;
+			case isc_info_req_delete_count:
+				deleted = isc_vax_integer(r, len);
+				break;
+		}
+		r += len;
+	}
+	switch (statement_type) {
+		case isc_info_sql_stmt_select: return selected;
+		case isc_info_sql_stmt_insert: return inserted;
+		case isc_info_sql_stmt_update: return updated;
+		case isc_info_sql_stmt_delete: return deleted;
+		default: return inserted + selected + updated + deleted;
+	}
+}
 
 /* call-seq:
  *   execute(sql, *args)
  */
-//static VALUE cursor_execute2(int argc, VALUE* argv, VALUE self)
 static VALUE cursor_execute2(VALUE args)
 {
 	struct FbCursor *fb_cursor;
@@ -1700,7 +1739,8 @@ static VALUE cursor_execute2(VALUE args)
 	long length;
 	long in_params;
 	long cols;
-	long items;
+	long rows_affected;
+	VALUE result = Qnil;
 	long isc_status[20];
 
 	VALUE self = rb_ary_pop(args);
@@ -1765,6 +1805,8 @@ static VALUE cursor_execute2(VALUE args)
 			isc_dsql_execute2(isc_status, &transact, &fb_cursor->stmt, SQLDA_VERSION1, 0, 0);
 			fb_error_check(isc_status);
 		}
+		rows_affected = cursor_rows_affected(fb_cursor, statement);
+		result = INT2NUM(rows_affected);
 		if (transact == fb_cursor->auto_transact) {
 			isc_commit_transaction(isc_status, &transact);
 			fb_error_check(isc_status);
@@ -1802,14 +1844,7 @@ static VALUE cursor_execute2(VALUE args)
 		fb_cursor->fields_ary = fb_cursor_fields_ary(o_sqlda, fb_connection->downcase_column_names);
 		fb_cursor->fields_hash = fb_cursor_fields_hash(fb_cursor->fields_ary);
 	}
-	/* Set the return object */
-	if (statement == isc_info_sql_stmt_select ||
-		statement == isc_info_sql_stmt_select_for_upd) {
-		return Qnil;
-	} else if (statement == isc_info_sql_stmt_ddl) {
-		return INT2NUM(STATEMENT_DDL);
-	}
-	return INT2NUM(STATEMENT_DML);
+	return result;
 }
 
 static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
