@@ -28,7 +28,7 @@
 #include <float.h>
 #include <time.h>
 
-#define	SQLDA_COLSINIT	10
+#define	SQLDA_COLSINIT	50
 #define	SQLCODE_NOMORE	100
 #define	TPBBUFF_ALLOC	64
 #define	CMND_DELIMIT	" \t\n\r\f"
@@ -93,6 +93,12 @@ struct FbCursor {
 	int open;
 	isc_tr_handle auto_transact;
 	isc_stmt_handle stmt;
+	XSQLDA *i_sqlda;
+	XSQLDA *o_sqlda;
+	char *i_buffer;
+	long  i_buffer_size;
+	char *o_buffer;
+	long  o_buffer_size;
 	VALUE fields_ary;
 	VALUE fields_hash;
 	VALUE connection;
@@ -109,13 +115,7 @@ typedef struct trans_opts
 
 /* global data */
 static isc_tr_handle global_transact = 0;	/* transaction handle */
-static XSQLDA *i_sqlda = 0;
-static XSQLDA *o_sqlda = 0;
-static char *results = 0;
-static long  ressize = 0;
-static char *paramts = 0;
-static long  prmsize = 0;
-static int db_num = 0;
+static int connection_count = 0;
 
 /* global utilities */
 
@@ -366,7 +366,7 @@ static void fb_connection_remove(struct FbConnection *fb_connection)
 			}
 		}
 		fb_connection->db = 0;
-		db_num--;
+		connection_count--;
 	}
 }
 
@@ -780,7 +780,7 @@ static void global_transaction_start(VALUE opt, int argc, VALUE *argv)
 {
 	long isc_status[20];
 	struct FbConnection *fb_connection;
-	ISC_TEB *teb_vec = ALLOCA_N(ISC_TEB, db_num);
+	ISC_TEB *teb_vec = ALLOCA_N(ISC_TEB, connection_count);
 	ISC_TEB *vec = teb_vec;
 	char *tpb = 0;
 	short n;
@@ -794,11 +794,11 @@ static void global_transaction_start(VALUE opt, int argc, VALUE *argv)
 		tpb = trans_parseopts(opt, &tpb_len);
 	}
 
-	if (argc > db_num) {
+	if (argc > connection_count) {
 		rb_raise(rb_eFbError, "Too many databases specified for the transaction");
 	}
 	if (argc == 0) {
-		n = db_num;
+		n = connection_count;
 		for (fb_connection = fb_connection_list; fb_connection; fb_connection = fb_connection->next) {
 			set_teb_vec(vec, fb_connection, tpb, tpb_len);
 			vec++;
@@ -1054,6 +1054,12 @@ static VALUE connection_cursor(VALUE self)
 	fb_cursor->fields_hash = Qnil;
 	fb_cursor->open = Qfalse;
 	fb_cursor->stmt = 0;
+	fb_cursor->i_sqlda = sqlda_alloc(SQLDA_COLSINIT);
+	fb_cursor->o_sqlda = sqlda_alloc(SQLDA_COLSINIT);
+	fb_cursor->i_buffer = NULL;
+	fb_cursor->i_buffer_size = 0;
+	fb_cursor->o_buffer = NULL;
+	fb_cursor->o_buffer_size = 0;
 	isc_dsql_alloc_statement2(isc_status, &fb_connection->db, &fb_cursor->stmt);
 	fb_error_check(isc_status);
 
@@ -1192,6 +1198,10 @@ static void fb_cursor_free(struct FbCursor *fb_cursor)
 	if (fb_cursor->stmt) {
 		fb_cursor_drop_warn(fb_cursor);
 	}
+	free(fb_cursor->i_sqlda);
+	free(fb_cursor->o_sqlda);
+	free(fb_cursor->i_buffer);
+	free(fb_cursor->o_buffer);
 	free(fb_cursor);
 }
 
@@ -1233,9 +1243,8 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 
 	/* Check the number of parameters */
-	if (i_sqlda->sqld != argc) {
-		rb_raise(rb_eFbError, "statement requires %d items; %d given",
-			i_sqlda->sqld, argc);
+	if (fb_cursor->i_sqlda->sqld != argc) {
+		rb_raise(rb_eFbError, "statement requires %d items; %d given", fb_cursor->i_sqlda->sqld, argc);
 	}
 
 	/* Get the parameters */
@@ -1245,7 +1254,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 		type = TYPE(obj);
 
 		/* Convert the data type for InterBase */
-		var = &i_sqlda->sqlvar[count];
+		var = &fb_cursor->i_sqlda->sqlvar[count];
 		if (!NIL_P(obj)) {
 			dtp = var->sqltype & ~1;		/* Erase null flag */
 			alignment = var->sqllen;
@@ -1254,7 +1263,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_TEXT :
 					alignment = 1;
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					obj = rb_obj_as_string(obj);
 					if (RSTRING(obj)->len > var->sqllen) {
 						rb_raise(rb_eRangeError, "CHAR overflow: %d bytes exceeds %d byte(s) allowed.",
@@ -1268,7 +1277,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_VARYING :
 					alignment = sizeof(short);
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					vary = (VARY *)var->sqldata;
 					obj = rb_obj_as_string(obj);
 					if (RSTRING(obj)->len > var->sqllen) {
@@ -1282,7 +1291,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 				case SQL_SHORT :
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					lvalue = NUM2LONG(obj);
 					if (lvalue < SHRT_MIN || lvalue > SHRT_MAX) {
 						rb_raise(rb_eRangeError, "short integer overflow");
@@ -1293,7 +1302,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 				case SQL_LONG :
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					lvalue = NUM2LONG(obj);
 					*(long *)var->sqldata = lvalue;
 					offset += alignment;
@@ -1301,7 +1310,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 				case SQL_FLOAT :
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					dvalue = NUM2DBL(obj);
 					if (dvalue >= 0.0) {
 						dcheck = dvalue;
@@ -1317,7 +1326,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 				case SQL_DOUBLE :
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					dvalue = NUM2DBL(obj);
 					*(double *)var->sqldata = dvalue;
 					offset += alignment;
@@ -1325,14 +1334,14 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 #if HAVE_LONG_LONG
 				case SQL_INT64 :
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					*(ISC_INT64 *)var->sqldata = NUM2LL(obj);
 					offset += alignment;
 					break;
 #endif
 				case SQL_BLOB :
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					obj = rb_obj_as_string(obj);
 
 					blob_handle = NULL;
@@ -1361,7 +1370,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 				case SQL_TIMESTAMP :
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					GetTimeval(obj, tobj);
 					isc_encode_timestamp(&tobj->tm, (ISC_TIMESTAMP *)var->sqldata);
 					offset += alignment;
@@ -1369,7 +1378,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 				case SQL_TYPE_TIME :
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					GetTimeval(obj, tobj);
 					isc_encode_sql_time(&tobj->tm, (ISC_TIME *)var->sqldata);
 					offset += alignment;
@@ -1377,7 +1386,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 				case SQL_TYPE_DATE :
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					GetTimeval(obj, tobj);
 					isc_encode_sql_date(&tobj->tm, (ISC_DATE *)var->sqldata);
 					offset += alignment;
@@ -1387,7 +1396,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_ARRAY :
 					/* Not supported now
 					offset = ALIGN(offset, alignment);
-					var->sqldata = (char *)(paramts + offset);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					if (get_arrayvalue(self, type, obj, var))
 						return(STATUS_ABNORMAL);
 					offset += alignment;
@@ -1403,14 +1412,14 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 			if (var->sqltype & 1) {
 				offset = ALIGN(offset, sizeof(short));
-				var->sqlind = (short *)(paramts + offset);
+				var->sqlind = (short *)(fb_cursor->i_buffer + offset);
 				*var->sqlind = 0;
 				offset += sizeof(short);
 			}
 		} else if (var->sqltype & 1) {
 			var->sqldata = 0;
 			offset = ALIGN(offset, sizeof(short));
-			var->sqlind = (short *)(paramts + offset);
+			var->sqlind = (short *)(fb_cursor->i_buffer + offset);
 			*var->sqlind = -1;
 			offset += sizeof(short);
 		} else {
@@ -1438,7 +1447,7 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 			fb_cursor_set_inputparams(fb_cursor, RARRAY(obj)->len, RARRAY(obj)->ptr);
 
 			/* Execute SQL statement */
-			isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, i_sqlda, 0);
+			isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, 0);
 			fb_error_check(isc_status);
 		}
 	} else {
@@ -1446,7 +1455,7 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 		fb_cursor_set_inputparams(fb_cursor, argc, argv);
 
 		/* Execute SQL statement */
-		isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, i_sqlda, 0);
+		isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, 0);
 		fb_error_check(isc_status);
 	}
 }
@@ -1568,30 +1577,6 @@ static VALUE fb_cursor_fields_hash(VALUE fields_ary)
 	return hash;
 }
 
-/* Check the input parameters */
-static void fb_cursor_check_inparams(struct FbCursor *fb_cursor, int argc, VALUE *argv, int exec)
-{
-	long items;
-
-	/* Check the parameter */
-	if (argc == 0) {
-		rb_raise(rb_eFbError, "Input parameters must be specified");
-	}
-
-	/* Execute specified process */
-	switch (exec) {
-		case EXECF_EXECDML:
-			fb_cursor_execute_withparams(fb_cursor, argc, argv);
-			break;
-		case EXECF_SETPARM:
-			fb_cursor_set_inputparams(fb_cursor, argc, argv);
-			break;
-		default:
-			rb_raise(rb_eFbError, "Should specify either EXECF_EXECDML or EXECF_SETPARM");
-			break;
-	}
-}
-
 static void fb_cursor_fetch_prep(struct FbCursor *fb_cursor)
 {
 	struct FbConnection *fb_connection;
@@ -1614,12 +1599,12 @@ static void fb_cursor_fetch_prep(struct FbCursor *fb_cursor)
 		rb_raise(rb_eFbError, "The cursor has not been open. Use execute(query)");
 	}
 	/* Describe output SQLDA */
-	isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, o_sqlda);
+	isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, fb_cursor->o_sqlda);
 	fb_error_check(isc_status);
 
 	/* Set the output SQLDA */
-	cols = o_sqlda->sqld;
-	for (var = o_sqlda->sqlvar, offset = 0, count = 0; count < cols; var++, count++) {
+	cols = fb_cursor->o_sqlda->sqld;
+	for (var = fb_cursor->o_sqlda->sqlvar, offset = 0, count = 0; count < cols; var++, count++) {
 		length = alignment = var->sqllen;
 		dtp = var->sqltype & ~1;
 
@@ -1630,10 +1615,10 @@ static void fb_cursor_fetch_prep(struct FbCursor *fb_cursor)
 			alignment = sizeof(short);
 		}
 		offset = ALIGN(offset, alignment);
-		var->sqldata = (char*)(results + offset);
+		var->sqldata = (char*)(fb_cursor->o_buffer + offset);
 		offset += length;
 		offset = ALIGN(offset, sizeof(short));
-		var->sqlind = (short*)(results + offset);
+		var->sqlind = (short*)(fb_cursor->o_buffer + offset);
 		offset += sizeof(short);
 	}
 }
@@ -1675,18 +1660,18 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	fb_connection_check(fb_connection);
 
 	/* Fetch one row */
-	if (isc_dsql_fetch(isc_status, &fb_cursor->stmt, 1, o_sqlda) == SQLCODE_NOMORE) {
+	if (isc_dsql_fetch(isc_status, &fb_cursor->stmt, 1, fb_cursor->o_sqlda) == SQLCODE_NOMORE) {
 		return Qnil;
 	}
 	fb_error_check(isc_status);
 
 	/* Create the result tuple object */
-	cols = o_sqlda->sqld;
+	cols = fb_cursor->o_sqlda->sqld;
 	ary = rb_ary_new2(cols);
 
 	/* Create the result objects for each columns */
 	for (count = 0; count < cols; count++) {
-		var = &o_sqlda->sqlvar[count];
+		var = &fb_cursor->o_sqlda->sqlvar[count];
 		dtp = var->sqltype & ~1;
 
 		/* Check if column is null */
@@ -1884,7 +1869,7 @@ static VALUE cursor_execute2(VALUE args)
 	sql = STR2CSTR(rb_ary_shift(args));
 
 	/* Prepare query */
-	isc_dsql_prepare(isc_status, &fb_connection->transact, &fb_cursor->stmt, 0, sql, fb_connection_dialect(fb_connection), o_sqlda);
+	isc_dsql_prepare(isc_status, &fb_connection->transact, &fb_cursor->stmt, 0, sql, fb_connection_dialect(fb_connection), fb_cursor->o_sqlda);
 	fb_error_check(isc_status);
 
 	/* Get the statement type */
@@ -1900,33 +1885,33 @@ static VALUE cursor_execute2(VALUE args)
 		statement = 0;
 	}
 	/* Describe the parameters */
-	isc_dsql_describe_bind(isc_status, &fb_cursor->stmt, 1, i_sqlda);
+	isc_dsql_describe_bind(isc_status, &fb_cursor->stmt, 1, fb_cursor->i_sqlda);
 	fb_error_check(isc_status);
 
-	isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, o_sqlda);
+	isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, fb_cursor->o_sqlda);
 	fb_error_check(isc_status);
 
 	/* Get the number of parameters and reallocate the SQLDA */
-	in_params = i_sqlda->sqld;
-	if (i_sqlda->sqln < in_params) {
-		free(i_sqlda);
-		i_sqlda = sqlda_alloc(in_params);
+	in_params = fb_cursor->i_sqlda->sqld;
+	if (fb_cursor->i_sqlda->sqln < in_params) {
+		free(fb_cursor->i_sqlda);
+		fb_cursor->i_sqlda = sqlda_alloc(in_params);
 		/* Describe again */
-		isc_dsql_describe_bind(isc_status, &fb_cursor->stmt, 1, i_sqlda);
+		isc_dsql_describe_bind(isc_status, &fb_cursor->stmt, 1, fb_cursor->i_sqlda);
 		fb_error_check(isc_status);
 	}
 
     /* Get the size of parameters buffer and reallocate it */
 	if (in_params) {
-		length = calculate_buffsize(i_sqlda);
-		if (length > prmsize) {
-			paramts = xrealloc(paramts, length);
-			prmsize = length;
+		length = calculate_buffsize(fb_cursor->i_sqlda);
+		if (length > fb_cursor->i_buffer_size) {
+			fb_cursor->i_buffer = xrealloc(fb_cursor->i_buffer, length);
+			fb_cursor->i_buffer_size = length;
 		}
 	}
 
     /* Execute the SQL statement if it is not query */
-	if (!o_sqlda->sqld) {
+	if (!fb_cursor->o_sqlda->sqld) {
 		if (statement == isc_info_sql_stmt_start_trans) {
 			rb_raise(rb_eFbError, "use Fb::Connection#transaction()");
 		} else if (statement == isc_info_sql_stmt_commit) {
@@ -1950,12 +1935,12 @@ static VALUE cursor_execute2(VALUE args)
 	} else {
 		/* Open cursor if the SQL statement is query */
 		/* Get the number of columns and reallocate the SQLDA */
-		cols = o_sqlda->sqld;
-		if (o_sqlda->sqln < cols) {
-			free(o_sqlda);
-			o_sqlda = sqlda_alloc(cols);
+		cols = fb_cursor->o_sqlda->sqld;
+		if (fb_cursor->o_sqlda->sqln < cols) {
+			free(fb_cursor->o_sqlda);
+			fb_cursor->o_sqlda = sqlda_alloc(cols);
 			/* Describe again */
-			isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, o_sqlda);
+			isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, fb_cursor->o_sqlda);
 			fb_error_check(isc_status);
 		}
 
@@ -1964,19 +1949,19 @@ static VALUE cursor_execute2(VALUE args)
 		}
 
 		/* Open cursor */
-		isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, in_params ? i_sqlda : 0, 0);
+		isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, in_params ? fb_cursor->i_sqlda : 0, 0);
 		fb_error_check(isc_status);
 		fb_cursor->open = Qtrue;
 
 		/* Get the size of results buffer and reallocate it */
-		length = calculate_buffsize(o_sqlda);
-		if (length > ressize) {
-			results = xrealloc(results, length);
-			ressize = length;
+		length = calculate_buffsize(fb_cursor->o_sqlda);
+		if (length > fb_cursor->o_buffer_size) {
+			fb_cursor->o_buffer = xrealloc(fb_cursor->o_buffer, length);
+			fb_cursor->o_buffer_size = length;
 		}
 
 		/* Set the description attributes */
-		fb_cursor->fields_ary = fb_cursor_fields_ary(o_sqlda, fb_connection->downcase_column_names);
+		fb_cursor->fields_ary = fb_cursor_fields_ary(fb_cursor->o_sqlda, fb_connection->downcase_column_names);
 		fb_cursor->fields_hash = fb_cursor_fields_hash(fb_cursor->fields_ary);
 	}
 	return result;
@@ -2263,12 +2248,8 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	VALUE connection = Data_Make_Struct(rb_cFbConnection, struct FbConnection, fb_connection_mark, fb_connection_free, fb_connection);
 	fb_connection->db = handle;
 	fb_connection->transact = 0;
-	i_sqlda = sqlda_alloc(SQLDA_COLSINIT);
-	o_sqlda = sqlda_alloc(SQLDA_COLSINIT);
-	results = paramts = 0;
-	ressize = prmsize = 0;
 	fb_connection->cursor = rb_ary_new();
-	db_num++;
+	connection_count++;
 	fb_connection->next = fb_connection_list;
 	fb_connection_list = fb_connection;
 
