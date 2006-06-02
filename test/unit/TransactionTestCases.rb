@@ -156,4 +156,32 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
+  
+  def test_simultaneous_transactions
+    db_file1 = "#{@db_file}1"
+    db_file2 = "#{@db_file}2"
+    rm_rf db_file1
+    rm_rf db_file2
+    parms1 = @parms.merge(:database => "#{@db_host}:#{db_file1}")
+    parms2 = @parms.merge(:database => "#{@db_host}:#{db_file2}")
+    Database.create(parms1) do |conn1|
+      Database.create(parms2) do |conn2|
+        assert !conn1.transaction_started, "conn1 transaction is started"
+        assert !conn2.transaction_started, "conn2 transaction is started"
+        conn1.transaction do
+          assert conn1.transaction_started, "conn1 transaction is not started"
+          assert !conn2.transaction_started, "conn2 transaction is started"
+          conn2.transaction do
+            assert conn2.transaction_started, "conn2 transaction is not started"
+            assert conn1.transaction_started, "conn1 transaction is not started"
+          end
+          assert !conn2.transaction_started, "conn2 transaction is still active"
+          assert conn1.transaction_started, "conn1 transaction is not still active"
+        end
+        assert !conn1.transaction_started, "conn1 transaction is still active"
+        conn2.drop
+      end
+      conn1.drop
+    end
+  end
 end
