@@ -115,6 +115,12 @@ class DatabaseTestCases < Test::Unit::TestCase
     end
   end
 
+  def test_create_bad_page_size
+    assert_raise Error do
+      db = Database.create(@parms.merge(:page_size => 1000))
+    end
+  end
+
   def test_connect_instance
     db = Database.create(@parms)
     connection = db.connect

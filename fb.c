@@ -851,7 +851,8 @@ static VALUE global_rollback()
 }
 
 /* call-seq:
- *   transaction(options, *connections) -> nil
+ *   transaction(options, *connections) -> true
+ *   transaction(options, *connections) { } -> block result
  *
  * Start a (global) transaction.
  */
@@ -1011,7 +1012,7 @@ static VALUE connection_rollback(VALUE self)
 
 /*
  * call-seq:
- *   open? -> true or false
+ *   open?() -> true or false
  *
  * Current connection status.
  */
@@ -1025,7 +1026,7 @@ static VALUE connection_is_open(VALUE self)
 }
 
 /* call-seq:
- *   to_s
+ *   to_s() -> String
  *
  * Return current database connection string and either (OPEN) or (CLOSED).
  */
@@ -1038,6 +1039,12 @@ static VALUE connection_to_s(VALUE self)
 	return rb_str_concat(s, status);
 }
 
+/* call-seq:
+ *   cursor() -> Cursor
+ *
+ * Creates a +Cursor+ for the +Connection+ and allocates a statement.
+ * This function is no longer published.
+ */
 static VALUE connection_cursor(VALUE self)
 {
 	long isc_status[20];
@@ -1067,8 +1074,22 @@ static VALUE connection_cursor(VALUE self)
 }
 
 /* call-seq:
- *   execute(sql, *args) -> Cursor
- *   execute(sql, *args) {|cursor| }
+ *   execute(sql, *args) -> Cursor or rows affected
+ *   execute(sql, *args) {|cursor| } -> block result
+ *
+ * Allocates a +Cursor+ and executes the +sql+ statement, matching up the 
+ * parameters in +args+ with the place holders in the statement, represented by ?'s.
+ *
+ * If the sql statement returns a result set and a block is provided, the cursor is
+ * yielded to the block before being automatically closed.
+ *
+ * If the sql statement returns a result set and a block is not provided, a Cursor
+ * object is returned.
+ *
+ * If no transaction is currently active, a transaction is automatically started
+ * and is closed when the cursor is closed.  Note that if additional statements
+ * yielding cursors are started before the first cursor is closed, these cursors will
+ * also be closed when the first one is closed and its transaction committed.
  */
 static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
 {
@@ -1088,7 +1109,7 @@ static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
 /* call-seq:
  *   close() -> nil
  *
- * Close connection.
+ * Closes connection to database.  All open cursors are dropped.
  */
 static VALUE connection_close(VALUE self)
 {
@@ -1108,7 +1129,7 @@ static VALUE connection_close(VALUE self)
 /* call-seq:
  *   drop() -> nil
  *
- * Drop connected database.
+ * Drops connected database.  All open cursors are dropped.
  */
 static VALUE connection_drop(VALUE self)
 {
@@ -1847,7 +1868,9 @@ static long cursor_rows_affected(struct FbCursor *fb_cursor, long statement_type
 }
 
 /* call-seq:
- *   execute(sql, *args)
+ *   execute2(sql, *args) -> nil or rows affected
+ *
+ * This function is not published.
  */
 static VALUE cursor_execute2(VALUE args)
 {
@@ -1926,12 +1949,6 @@ static VALUE cursor_execute2(VALUE args)
 		}
 		rows_affected = cursor_rows_affected(fb_cursor, statement);
 		result = INT2NUM(rows_affected);
-		/*
-		if (fb_connection->transact == fb_cursor->auto_transact) {
-			fb_connection_commit(fb_connection);
-			fb_cursor->auto_transact = fb_connection->transact;
-		}
-		*/
 	} else {
 		/* Open cursor if the SQL statement is query */
 		/* Get the number of columns and reallocate the SQLDA */
@@ -1967,6 +1984,11 @@ static VALUE cursor_execute2(VALUE args)
 	return result;
 }
 
+/* call-seq:
+ *   execute(sql, *args) -> nil or rows affected
+ *
+ * This function is no longer published.
+ */
 static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 {
 	struct FbCursor *fb_cursor;
@@ -2037,6 +2059,16 @@ static int hash_format(int argc, VALUE *argv)
 	}
 }
 
+/* call-seq:
+ *   fetch() -> Array
+ *   fetch(:array) -> Array
+ *   fetch(:hash) -> Hash
+ *
+ * Reads and returns a single row from the open cursor in either an Array or a Hash,
+ * where the column names or aliases from the query form the keys.
+ * If the +downcase_column_names+ attribute of the associated connection evaluates to true,
+ * the keys are lower case, except where the column name was mixed case to begin with.
+ */
 static VALUE cursor_fetch(int argc, VALUE* argv, VALUE self)
 {
 	VALUE ary;
@@ -2051,6 +2083,16 @@ static VALUE cursor_fetch(int argc, VALUE* argv, VALUE self)
 	return hash_row ? fb_hash_from_ary(fb_cursor->fields_ary, ary) : ary;
 }
 
+/* call-seq:
+ *   fetchall() -> Array of Arrays
+ *   fetchall(:array) -> Array of Arrays
+ *   fetchall(:hash) -> Array of Hashes
+ *
+ * Returns the remainder of the rows from the open cursor, with each row represented
+ * by either an Array or a Hash, where the column names or aliases from the query form the keys.
+ * If the +downcase_column_names+ attribute of the associated connection evaluates to true,
+ * the keys are lower case, except where the column name was mixed case to begin with.
+ */
 static VALUE cursor_fetchall(int argc, VALUE* argv, VALUE self)
 {
 	VALUE ary, row;
@@ -2075,6 +2117,16 @@ static VALUE cursor_fetchall(int argc, VALUE* argv, VALUE self)
 	return ary;
 }
 
+/* call-seq:
+ *   each() {|Array| } -> nil
+ *   each(:array) {|Array| } -> nil
+ *   each(:hash) {|Hash| } -> nil
+ *
+ * Iterates the rows from the open cursor, passing each one to a block in either
+ * an Array or a Hash, where the column names or aliases from the query form the keys.
+ * If the +downcase_column_names+ attribute of the associated connection evaluates to true,
+ * the keys are lower case, except where the column name was mixed case to begin with.
+ */
 static VALUE cursor_each(int argc, VALUE* argv, VALUE self)
 {
 	VALUE ary, row;
@@ -2098,6 +2150,11 @@ static VALUE cursor_each(int argc, VALUE* argv, VALUE self)
 	return Qnil;
 }
 
+/* call-seq:
+ *   close(sql, *args) -> nil
+ *
+ * Closes the cursor.  If a transaction was automatically started for this cursor, the transaction is commited.
+ */
 static VALUE cursor_close(VALUE self)
 {
 	struct FbCursor *fb_cursor;
@@ -2128,7 +2185,7 @@ static VALUE cursor_close(VALUE self)
 /* call-seq:
  *   drop() -> nil
  *
- * Drop the cursor.
+ * Drops the cursor.
  *
  * TODO: How is this different from close()?
  */
@@ -2160,6 +2217,8 @@ static VALUE cursor_drop(VALUE self)
  *   fields(:hash) -> Hash
  *
  * Return an array of Field Structs or a hash indexed by field name.
+ * If the +downcase_column_names+ attribute of the associated connection evaluates to true,
+ * the keys are lower case, except where the column name was mixed case to begin with.
  */
 static VALUE cursor_fields(int argc, VALUE* argv, VALUE self)
 {
@@ -2175,6 +2234,11 @@ static VALUE cursor_fields(int argc, VALUE* argv, VALUE self)
 	}
 }
 
+/* call-seq:
+ *   error_code -> int
+ *
+ * Returns the sqlcode associated with the error.
+ */
 static VALUE error_error_code(VALUE error)
 {
 	rb_p(error);
@@ -2352,6 +2416,11 @@ static VALUE connection_procedure_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+/* call-seq:
+ *   from_code(code, subtype) -> String
+ *
+ * Returns the SQL type, such as VARCHAR or INTEGER for a given type code and subtype.
+ */
 static VALUE sql_type_from_code(VALUE self, VALUE code, VALUE subtype)
 {
 	return fb_sql_type_from_code(NUM2INT(code), NUM2INT(subtype));
@@ -2408,6 +2477,13 @@ static VALUE hash_from_connection_string(VALUE cs)
 	return hash;
 }
 
+static void check_page_size(int page_size)
+{
+	if (page_size != 1024 && page_size != 2048 && page_size != 4096 && page_size != 8192) {
+		rb_raise(rb_eFbError, "Invalid page size: %d", page_size);
+	}
+}
+
 /* call-seq:
  *   Database.new(options) -> Database
  *
@@ -2448,6 +2524,8 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
  *   create() {|connection| } -> Database
  *
  * Create a database using the current database options.
+ * If a block is provided, an open connection to the new database is passed to it
+ * before being automatically closed.
  */
 static VALUE database_create(VALUE self)
 {
@@ -2462,6 +2540,9 @@ static VALUE database_create(VALUE self)
 	VALUE password = rb_iv_get(self, "@password");
 	VALUE page_size = rb_iv_get(self, "@page_size");
 	VALUE charset = rb_iv_get(self, "@charset");
+
+	check_page_size(NUM2INT(page_size));
+
 	parms = rb_ary_new3(5, database, username, password, page_size, charset);
 
 	fmt = rb_str_new2("CREATE DATABASE '%s' USER '%s' PASSWORD '%s' PAGE_SIZE = %d DEFAULT CHARACTER SET %s;");
@@ -2489,6 +2570,8 @@ static VALUE database_create(VALUE self)
  *   Database.create(options) {|connection| } -> Database
  *
  * Create a database using the specified options (see: Database.new for details of options Hash).
+ * If a block is provided, an open connection to the new database is passed to it
+ * before being automatically closed.
  */
 static VALUE database_s_create(int argc, VALUE *argv, VALUE klass)
 {
@@ -2502,6 +2585,9 @@ static VALUE database_s_create(int argc, VALUE *argv, VALUE klass)
  *   connect() {|connection| } -> nil
  *
  * Connect to the database specified by the current database options.
+ *
+ * If a block is provided, the open connection is passed to it before being
+ * automatically closed.
  */
 static VALUE database_connect(VALUE self)
 {
@@ -2531,6 +2617,9 @@ static VALUE database_connect(VALUE self)
  *   Database.connect(options) {|connection| } -> nil
  *
  * Connect to a database using the options given (see: Database.new for details of options Hash).
+ *
+ * If a block is provided, the open connection is passed to it before being
+ * automatically closed.
  */
 static VALUE database_s_connect(int argc, VALUE *argv, VALUE klass)
 {
