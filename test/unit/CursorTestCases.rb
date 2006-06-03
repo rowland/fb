@@ -189,4 +189,47 @@ class CursorTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
+  
+  def test_simultaneous_cursors
+    sql_schema = <<-END
+      CREATE TABLE MASTER (ID INT, NAME1 VARCHAR(10));
+      CREATE TABLE DETAIL (ID INT, MASTER_ID INT, NAME2 VARCHAR(10));
+    END
+    sql_insert_master = "INSERT INTO MASTER (ID, NAME1) VALUES (?, ?)"
+    sql_insert_detail = "INSERT INTO DETAIL (ID, MASTER_ID, NAME2) VALUES (?, ?, ?)"
+    sql_select_master = "SELECT * FROM MASTER ORDER BY ID"
+    sql_select_detail = "SELECT * FROM DETAIL ORDER BY ID"
+    Database.create(@parms) do |connection|
+      connection.execute_script(sql_schema)
+      connection.transaction do
+        3.times do |m|
+          connection.execute(sql_insert_master, m, "name_#{m}")
+        end
+        9.times do |d|
+          connection.execute(sql_insert_detail, d, d / 3, "name_#{d / 3}_#{d}")
+        end
+      end
+      master = connection.execute(sql_select_master)
+      begin
+        detail = connection.execute(sql_select_detail)
+        begin
+          3.times do |m|
+            mr = master.fetch
+            assert_equal m, mr[0]
+            assert_equal "name_#{m}", mr[1]
+            3.times do |d|
+              dr = detail.fetch
+              assert_equal m * 3 + d, dr[0]
+              assert_equal m, dr[1]
+              assert_equal "name_#{m}_#{m * 3 + d}", dr[2]
+            end
+          end
+        ensure
+          detail.close
+        end
+      ensure
+        master.close
+      end
+    end
+  end
 end
