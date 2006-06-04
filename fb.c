@@ -306,6 +306,7 @@ static XSQLDA* sqlda_alloc(long cols)
 static VALUE cursor_close _((VALUE));
 static VALUE cursor_drop _((VALUE));
 static VALUE cursor_execute _((int, VALUE*, VALUE));
+static VALUE cursor_fetchall _((int, VALUE*, VALUE));
 
 static void fb_cursor_mark();
 static void fb_cursor_free();
@@ -1086,6 +1087,9 @@ static VALUE connection_cursor(VALUE self)
  * If the sql statement returns a result set and a block is not provided, a Cursor
  * object is returned.
  *
+ * If the sql statement performs an INSERT, UPDATE or DELETE, the number of rows
+ * affected is returned.  Other statements, such as schema updates, return -1.
+ *
  * If no transaction is currently active, a transaction is automatically started
  * and is closed when the cursor is closed.  Note that if additional statements
  * yielding cursors are started before the first cursor is closed, these cursors will
@@ -1104,6 +1108,41 @@ static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
    		}
 	}
 	return val;
+}
+
+/* call-seq:
+ *   query(:array, sql, *arg) -> Array of Arrays or nil
+ *   query(:hash, sql, *arg) -> Array of Hashes or nil
+ *   query(sql, *args) -> Array of Arrays or nil
+ *
+ * For queries returning a result set, an array is returned, containing
+ * either a list of Arrays or Hashes, one for each row.
+ *
+ * If the sql statement performs an INSERT, UPDATE or DELETE, the number of rows
+ * affected is returned.  Other statements, such as schema updates, return -1.
+ * 
+ * If no transaction is currently active, a transacdtion is automatically started
+ * and committed.  Otherwise, the statement executes within the context of the
+ * current transaction.
+ */
+static VALUE connection_query(int argc, VALUE *argv, VALUE self)
+{
+	VALUE format;
+	VALUE cursor;
+	VALUE result;
+	
+	if (argc >= 1 && TYPE(argv[0]) == T_SYMBOL) {
+		format = argv[0];
+		argc--; argv++;
+	} else {
+		format = ID2SYM(rb_intern("array"));
+	}
+	cursor = connection_cursor(self);
+	result = cursor_execute(argc, argv, cursor);
+	if (NIL_P(result)) {
+		result = cursor_fetchall(1, &format, cursor);
+	}
+	return result;
 }
 
 /* call-seq:
@@ -2688,6 +2727,7 @@ void Init_fb()
 	rb_define_attr(rb_cFbConnection, "downcase_column_names", 1, 1);
 	rb_define_method(rb_cFbConnection, "to_s", connection_to_s, 0);
 	rb_define_method(rb_cFbConnection, "execute", connection_execute, -1);
+	rb_define_method(rb_cFbConnection, "query", connection_query, -1);	
 	rb_define_method(rb_cFbConnection, "transaction", connection_transaction, -1);
 	rb_define_method(rb_cFbConnection, "transaction_started", connection_transaction_started, 0);
 	rb_define_method(rb_cFbConnection, "commit", connection_commit, 0);

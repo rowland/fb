@@ -20,6 +20,53 @@ class ConnectionTestCases < Test::Unit::TestCase
     end
   end
   
+  def test_query_select
+    sql_select = "SELECT * FROM RDB$DATABASE"
+    Database.create(@parms) do |connection|
+      d = connection.query(sql_select)
+      assert_instance_of Array, d
+      assert_equal 1, d.size
+      assert_instance_of Array, d.first
+      assert_equal 4, d.first.size
+
+      a = connection.query(:array, sql_select)
+      assert_instance_of Array, a
+      assert_equal 1, a.size
+      assert_instance_of Array, a.first
+      assert_equal 4, a.first.size
+
+      h = connection.query(:hash, sql_select)
+      assert_instance_of Array, h
+      assert_equal 1, h.size
+      assert_instance_of Hash, h.first
+      assert_equal 4, h.first.keys.size
+      assert h.first.keys.include?("RDB$DESCRIPTION")
+      assert h.first.keys.include?("RDB$RELATION_ID")
+      assert h.first.keys.include?("RDB$SECURITY_CLASS")
+      assert h.first.keys.include?("RDB$CHARACTER_SET_NAME")
+    end
+  end
+  
+  def test_query_update
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_update = "UPDATE TEST SET ID = ?, NAME = ? WHERE ID = ?"
+    sql_delete = "DELETE FROM TEST WHERE ID = ?"
+    Database.create(@parms) do |connection|
+      su = connection.query(sql_schema)
+      assert_equal -1, su
+      
+      i = connection.query(sql_insert, 1, "NAME")
+      assert_equal 1, i
+      
+      u = connection.query(sql_update, 1, "NAME2", 1)
+      assert_equal 1, u
+      
+      d = connection.query(sql_delete, 1)
+      assert_equal 1, d
+    end
+  end
+  
   def test_insert_blobs_text
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20), MEMO BLOB SUB_TYPE TEXT)"
     sql_insert = "INSERT INTO TEST (ID, NAME, MEMO) VALUES (?, ?, ?)"
