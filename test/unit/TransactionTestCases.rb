@@ -72,6 +72,28 @@ class TransactionTestCases < Test::Unit::TestCase
     end
   end
   
+  def test_auto_transaction_query
+    Database.create(@parms) do |connection|
+      assert !connection.transaction_started
+      rs = connection.query("select * from rdb$database")
+      assert !connection.transaction_started
+      connection.drop
+    end
+  end
+  
+  def test_query_in_transaction
+    Database.create(@parms) do |connection|
+      assert !connection.transaction_started
+      connection.transaction do
+        assert connection.transaction_started
+        rs = connection.query("select * from rdb$database")
+        assert connection.transaction_started
+      end
+      assert !connection.transaction_started
+      connection.drop
+    end
+  end
+  
   def test_insert_commit
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"

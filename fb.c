@@ -1141,7 +1141,9 @@ static VALUE connection_query(int argc, VALUE *argv, VALUE self)
 	result = cursor_execute(argc, argv, cursor);
 	if (NIL_P(result)) {
 		result = cursor_fetchall(1, &format, cursor);
+		cursor_close(cursor);
 	}
+
 	return result;
 }
 
