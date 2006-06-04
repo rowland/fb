@@ -52,6 +52,7 @@ class ConnectionTestCases < Test::Unit::TestCase
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
     sql_update = "UPDATE TEST SET ID = ?, NAME = ? WHERE ID = ?"
     sql_delete = "DELETE FROM TEST WHERE ID = ?"
+    sql_select = "SELECT * FROM TEST"
     Database.create(@parms) do |connection|
       su = connection.query(sql_schema)
       assert_equal -1, su
@@ -64,6 +65,10 @@ class ConnectionTestCases < Test::Unit::TestCase
       
       d = connection.query(sql_delete, 1)
       assert_equal 1, d
+      
+      q = connection.query(sql_select)
+      assert_instance_of Array, q
+      assert_equal 0, q.size
     end
   end
   

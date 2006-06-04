@@ -1121,7 +1121,7 @@ static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
  * If the sql statement performs an INSERT, UPDATE or DELETE, the number of rows
  * affected is returned.  Other statements, such as schema updates, return -1.
  * 
- * If no transaction is currently active, a transacdtion is automatically started
+ * If no transaction is currently active, a transaction is automatically started
  * and committed.  Otherwise, the statement executes within the context of the
  * current transaction.
  */
