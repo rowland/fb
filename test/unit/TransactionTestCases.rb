@@ -184,4 +184,54 @@ class TransactionTestCases < Test::Unit::TestCase
       conn1.drop
     end
   end
+  
+  def test_transaction_options_snapshot
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
+    sql_delete = "DELETE FROM TEST WHERE ID < ?"
+    Database.create(@parms) do |conn1|
+      conn1.execute(sql_schema)
+      conn1.transaction do
+        10.times do |i|
+          conn1.execute(sql_insert, i, "NAME#{i}")
+        end
+      end
+      Database.connect(@parms) do |conn2|
+        conn2.transaction("SNAPSHOT") do
+          affected = conn1.execute(sql_delete, 5)
+          assert_equal 5, affected
+          rs1 = conn2.query(sql_select)
+          assert_equal 10, rs1.size
+        end
+        rs2 = conn2.query(sql_select)
+        assert_equal 5, rs2.size
+      end
+    end
+  end
+  
+  def test_transaction_options_read_committed
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
+    sql_delete = "DELETE FROM TEST WHERE ID < ?"
+    Database.create(@parms) do |conn1|
+      conn1.execute(sql_schema)
+      conn1.transaction do
+        10.times do |i|
+          conn1.execute(sql_insert, i, "NAME#{i}")
+        end
+      end
+      Database.connect(@parms) do |conn2|
+        conn2.transaction("READ COMMITTED") do
+          affected = conn1.execute(sql_delete, 5)
+          assert_equal 5, affected
+          rs1 = conn2.query(sql_select)
+          assert_equal 5, rs1.size
+        end
+        rs2 = conn2.query(sql_select)
+        assert_equal 5, rs2.size
+      end
+    end
+  end
 end
