@@ -150,6 +150,29 @@ class ConnectionTestCases < Test::Unit::TestCase
     end
   end
 
+  def test_multi_insert
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST"
+    sql_data = [
+      [1, "Name 1"],
+      [2, "Name 2"],
+      [3, "Name 3"]]
+    sql_data1 = [4, "Name 4"]
+    sql_data2 = [5, "Name 5"]
+    sql_data3 = [6, "Name 6"]
+    Database.create(@parms) do |connection|
+      connection.execute(sql_schema)
+      connection.execute(sql_insert, sql_data)
+      rs = connection.query(sql_select)
+      assert_equal 3, rs.size
+
+      connection.execute(sql_insert, sql_data1, sql_data2, sql_data3)
+      rs = connection.query(sql_select)
+      assert_equal 6, rs.size
+    end
+  end
+
   def test_dialects
     db = Database.create(@parms) do |connection|
       assert_equal 3, connection.dialect

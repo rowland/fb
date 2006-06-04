@@ -1081,11 +1081,14 @@ static VALUE connection_cursor(VALUE self)
  * If the sql statement returns a result set and a block is provided, the cursor is
  * yielded to the block before being automatically closed.
  *
- * If the sql statement returns a result set and a block is not provided, a Cursor
+ * If the sql statement returns a result set and a block is not provided, a +Cursor+
  * object is returned.
  *
  * If the sql statement performs an INSERT, UPDATE or DELETE, the number of rows
  * affected is returned.  Other statements, such as schema updates, return -1.
+ *
+ * +*args+ can be one or more tuples of parameters or an array of tuples (arrays),
+ * in which case the statement will be executed once for each tuple of parameters.
  *
  * If no transaction is currently active, a transaction is automatically started
  * and is closed when the cursor is closed.  Note that if additional statements
@@ -1493,19 +1496,26 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 	/* Check the first object type of the parameters */
 	if (argc >= 1 && TYPE(argv[0]) == T_ARRAY) {
-		VALUE obj;
 		int i;
-
-		for (i = 0; i < argc; i++) {
-			obj = argv[i];
-
-			/* Set the input parameters */
-			Check_Type(obj, T_ARRAY);
-			fb_cursor_set_inputparams(fb_cursor, RARRAY(obj)->len, RARRAY(obj)->ptr);
-
-			/* Execute SQL statement */
-			isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, 0);
-			fb_error_check(isc_status);
+		VALUE obj;
+		VALUE ary = argv[0];
+		if (RARRAY(ary)->len > 0 && TYPE(RARRAY(ary)->ptr[0]) == T_ARRAY) {
+			for (i = 0; i < RARRAY(ary)->len; i++) {
+				obj = rb_ary_entry(ary, i);
+				fb_cursor_execute_withparams(fb_cursor, 1, &obj);
+			}
+		} else {
+			for (i = 0; i < argc; i++) {
+				obj = argv[i];
+	
+				/* Set the input parameters */
+				Check_Type(obj, T_ARRAY);
+				fb_cursor_set_inputparams(fb_cursor, RARRAY(obj)->len, RARRAY(obj)->ptr);
+	
+				/* Execute SQL statement */
+				isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, 0);
+				fb_error_check(isc_status);
+			}
 		}
 	} else {
 		/* Set the input parameters */
