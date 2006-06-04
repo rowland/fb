@@ -946,11 +946,8 @@ static VALUE connection_transaction(int argc, VALUE *argv, VALUE self)
 {
 	struct FbConnection *fb_connection;
 	VALUE opt = Qnil;
-	
-	if (argc > 0) {
-		opt = *argv++;
-		argc--;
-	}
+
+	rb_scan_args(argc, argv, "01", &opt);
 	Data_Get_Struct(self, struct FbConnection, fb_connection);
 	
 	fb_connection_transaction_start(fb_connection, opt);
