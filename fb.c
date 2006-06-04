@@ -1808,7 +1808,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					if (t < 0) t = t + (24 * 60 * 60);
 					val = rb_time_new(t, 0);
 					*/
-					tms.tm_year = 1970;
+					tms.tm_year = 2000;
 					tms.tm_mon = 1;
 					tms.tm_mday = 1;
 					val = fb_mktime(&tms);
