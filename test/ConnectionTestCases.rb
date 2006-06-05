@@ -312,4 +312,56 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert_equal 'PLUSONE', names[0]
     end
   end
+
+  def test_index_names
+    sql_schema = <<-END
+      CREATE TABLE MASTER (ID INT NOT NULL, NAME1 VARCHAR(10));
+      CREATE TABLE DETAIL (ID INT NOT NULL, MASTER_ID INT, NAME2 VARCHAR(10));
+      ALTER TABLE MASTER ADD CONSTRAINT PK_MASTER PRIMARY KEY(ID);
+      ALTER TABLE DETAIL ADD CONSTRAINT PK_DETAIL PRIMARY KEY(ID);
+      ALTER TABLE DETAIL ADD CONSTRAINT FK_DETAIL_MASTER_ID FOREIGN KEY(MASTER_ID) REFERENCES MASTER(ID);
+      CREATE UNIQUE ASCENDING INDEX IX_MASTER_NAME1 ON MASTER(NAME1);
+      CREATE DESCENDING INDEX IX_DETAIL_ID_DESC ON DETAIL(ID);
+    END
+    Database.create(@parms) do |connection|
+      connection.execute_script(sql_schema)
+      indexes = connection.indexes # Hash of Structs using index names as keys
+      assert_equal 5, indexes.size
+      require 'pp'
+      pp indexes
+      assert indexes.keys.include?('PK_MASTER')
+      assert indexes.keys.include?('PK_DETAIL')
+      assert indexes.keys.include?('FK_DETAIL_MASTER_ID')
+      assert indexes.keys.include?('IX_MASTER_NAME1')
+      assert indexes.keys.include?('IX_DETAIL_ID_DESC')
+
+      master_indexes = indexes.values.select {|ix| ix.table_name == 'MASTER' }
+      assert_equal 2, master_indexes.size
+      
+      detail_indexes = indexes.values.select {|ix| ix.table_name == 'DETAIL' }
+      assert_equal 3, detail_indexes.size
+      
+      assert_equal 'MASTER', indexes['PK_MASTER'].table_name
+      assert indexes['PK_MASTER'].unique
+      assert !indexes['PK_MASTER'].descending
+
+      assert_equal 'MASTER', indexes['IX_MASTER_NAME1'].table_name
+      assert indexes['IX_MASTER_NAME1'].unique
+      assert !indexes['IX_MASTER_NAME1'].descending
+      
+      assert_equal 'DETAIL', indexes['PK_DETAIL'].table_name
+      assert indexes['PK_DETAIL'].unique
+      assert !indexes['PK_DETAIL'].descending
+
+      assert_equal 'DETAIL', indexes['FK_DETAIL_MASTER_ID'].table_name
+      assert !indexes['FK_DETAIL_MASTER_ID'].unique
+      assert !indexes['FK_DETAIL_MASTER_ID'].descending
+
+      assert_equal 'DETAIL', indexes['IX_DETAIL_ID_DESC'].table_name
+      assert !indexes['IX_DETAIL_ID_DESC'].unique
+      assert indexes['IX_DETAIL_ID_DESC'].descending      
+      
+      connection.drop
+    end
+  end
 end

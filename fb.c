@@ -51,6 +51,7 @@ static VALUE rb_cFbSqlType;
 static VALUE rb_cFbGlobal;
 static VALUE rb_eFbError;
 static VALUE rb_sFbField;
+static VALUE rb_sFbIndex;
 
 static char isc_info_stmt[] = { isc_info_sql_stmt_type };
 static char isc_info_buff[16];
@@ -2464,6 +2465,66 @@ static VALUE connection_procedure_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+static VALUE connection_index_columns(VALUE self, VALUE index_name)
+{
+	char *sql_columns = "SELECT * "
+						"FROM RDB$INDEX_SEGMENTS "
+						"WHERE RDB$INDEX_SEGMENTS.RDB$INDEX_NAME = ? "
+						"ORDER BY RDB$INDEX_SEGMENTS.RDB$FIELD_POSITION";
+	ID id_rstrip_bang = rb_intern("rstrip!");
+	VALUE query_columns = rb_str_new2(sql_columns);
+	VALUE query_parms[] = { query_columns, index_name };
+	VALUE result = connection_query(2, query_parms, self);
+	VALUE columns = rb_ary_new();
+	int i;
+	for (i = 0; i < RARRAY(result)->len; i++) {
+		VALUE row = rb_ary_entry(result, i);
+		VALUE name = rb_ary_entry(row, 1);
+		rb_funcall(name, id_rstrip_bang, 0);
+		rb_ary_push(columns, name);
+	}
+	return columns;
+}
+
+/* call-seq:
+ *   indexes() -> Hash
+ *
+ * Returns a hash of indexes, keyed by index name.
+ */
+static VALUE connection_indexes(VALUE self)
+{
+	char *sql_indexes = "SELECT RDB$INDICES.RDB$RELATION_NAME, RDB$INDICES.RDB$INDEX_NAME, RDB$INDICES.RDB$UNIQUE_FLAG, RDB$INDICES.RDB$INDEX_TYPE "
+						"FROM RDB$INDICES "
+						"  JOIN RDB$RELATIONS ON RDB$INDICES.RDB$RELATION_NAME = RDB$RELATIONS.RDB$RELATION_NAME "
+						"WHERE (RDB$RELATIONS.RDB$SYSTEM_FLAG <> 1 OR RDB$RELATIONS.RDB$SYSTEM_FLAG IS NULL) ";
+	ID id_rstrip_bang = rb_intern("rstrip!");
+	VALUE query_indexes = rb_str_new2(sql_indexes);
+	VALUE ary_indexes = connection_query(1, &query_indexes, self);
+	VALUE indexes = rb_hash_new();
+	int i;
+	for (i = 0; i < RARRAY(ary_indexes)->len; i++) {
+		VALUE index_struct;
+		VALUE row = rb_ary_entry(ary_indexes, i);
+		VALUE table_name = rb_ary_entry(row, 0);
+		VALUE index_name = rb_ary_entry(row, 1);
+		VALUE unique = rb_ary_entry(row, 2);
+		VALUE descending = rb_ary_entry(row, 3);
+		VALUE columns = connection_index_columns(self, index_name);
+
+		rb_funcall(table_name, id_rstrip_bang, 0);
+		rb_funcall(index_name, id_rstrip_bang, 0);
+		rb_str_freeze(table_name);
+		rb_str_freeze(index_name);
+		
+		unique = RTEST(unique) ? Qtrue : Qfalse;
+		descending = RTEST(descending) ? Qtrue : Qfalse;
+		
+		index_struct = rb_struct_new(rb_sFbIndex, table_name, index_name, unique, descending, columns, NULL);
+		rb_hash_aset(indexes, index_name, index_struct);
+	}
+	return indexes;
+}
+
 /* call-seq:
  *   from_code(code, subtype) -> String
  *
@@ -2752,6 +2813,7 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "view_names", connection_view_names, 0);
 	rb_define_method(rb_cFbConnection, "role_names", connection_role_names, 0);
 	rb_define_method(rb_cFbConnection, "procedure_names", connection_procedure_names, 0);
+	rb_define_method(rb_cFbConnection, "indexes", connection_indexes, 0);
 	//rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0);
 
 	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
@@ -2778,4 +2840,5 @@ void Init_fb()
 	rb_define_method(rb_eFbError, "error_code", error_error_code, 0);
 
 	rb_sFbField = rb_struct_define("Field", "name", "sql_type", "sql_subtype", "display_size", "internal_size", "precision", "scale", "nullable", "type_code", NULL);
+	rb_sFbIndex = rb_struct_define(NULL, "table_name", "index_name", "unique", "descending", "columns", NULL);
 }
