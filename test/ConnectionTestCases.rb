@@ -327,8 +327,6 @@ class ConnectionTestCases < Test::Unit::TestCase
       connection.execute_script(sql_schema)
       indexes = connection.indexes # Hash of Structs using index names as keys
       assert_equal 5, indexes.size
-      require 'pp'
-      pp indexes
       assert indexes.keys.include?('PK_MASTER')
       assert indexes.keys.include?('PK_DETAIL')
       assert indexes.keys.include?('FK_DETAIL_MASTER_ID')
