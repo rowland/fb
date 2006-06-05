@@ -3,3 +3,12 @@ README
 extconf.rb
 fb.c
 mkmf.cmd
+fb.gemspec
+test
+test\ConnectionTestCases.rb
+test\CursorTestCases.rb
+test\DatabaseTestCases.rb
+test\DataTypesTestCases.rb
+test\FbTestCases.rb
+test\FbTestSuite.rb
+test\TransactionTestCases.rb
