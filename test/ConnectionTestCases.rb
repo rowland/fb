@@ -246,8 +246,8 @@ class ConnectionTestCases < Test::Unit::TestCase
   
   def test_table_names
     sql_schema = <<-END
-      create table test1 (id int);
-      create table test2 (id int);
+      CREATE TABLE TEST1 (ID INT);
+      CREATE TABLE TEST2 (ID INT);
     END
     Database.create(@parms) do |connection|
       connection.execute_script(sql_schema)
@@ -257,16 +257,42 @@ class ConnectionTestCases < Test::Unit::TestCase
     end
   end
 
+  def test_table_names_downcased
+    sql_schema = <<-END
+      CREATE TABLE TEST1 (ID INT);
+      CREATE TABLE "Test2" (ID INT);
+    END
+    Database.create(@parms.merge(:downcase_names => true)) do |connection|
+      connection.execute_script(sql_schema)
+      table_names = connection.table_names
+      assert_equal 'test1', table_names[0]
+      assert_equal 'Test2', table_names[1]
+    end
+  end
+
   def test_generator_names
     sql_schema = <<-END
-      create generator test1_seq;
-      create generator test2_seq;
+      CREATE GENERATOR TEST1_SEQ;
+      CREATE GENERATOR TEST2_SEQ;
     END
     Database.create(@parms) do |connection|
       connection.execute_script(sql_schema)
       names = connection.generator_names
       assert_equal 'TEST1_SEQ', names[0]
       assert_equal 'TEST2_SEQ', names[1]
+    end
+  end
+
+  def test_generator_names_downcased
+    sql_schema = <<-END
+      CREATE GENERATOR TEST1_SEQ;
+      CREATE GENERATOR "TEST2_seq";
+    END
+    Database.create(@parms.merge(:downcase_names => true)) do |connection|
+      connection.execute_script(sql_schema)
+      names = connection.generator_names
+      assert_equal 'test1_seq', names[0]
+      assert_equal 'TEST2_seq', names[1]
     end
   end
 
@@ -285,6 +311,21 @@ class ConnectionTestCases < Test::Unit::TestCase
     end
   end
 
+  def test_view_names_downcased
+    sql_schema = <<-END
+      CREATE TABLE TEST1 (ID INT, NAME1 VARCHAR(10));
+      CREATE TABLE TEST2 (ID INT, NAME2 VARCHAR(10));
+      CREATE VIEW VIEW1 AS SELECT TEST1.ID, TEST1.NAME1, TEST2.NAME2 FROM TEST1 JOIN TEST2 ON TEST1.ID = TEST2.ID;
+      CREATE VIEW "View2" AS SELECT TEST2.ID, TEST1.NAME1, TEST2.NAME2 FROM TEST1 JOIN TEST2 ON TEST1.NAME1 = TEST2.NAME2;
+    END
+    Database.create(@parms.merge(:downcase_names => true)) do |connection|
+      connection.execute_script(sql_schema)
+      names = connection.view_names
+      assert_equal 'view1', names[0]
+      assert_equal 'View2', names[1]
+    end
+  end
+
   def test_role_names
     sql_schema = <<-END
       create role reader;
@@ -295,6 +336,19 @@ class ConnectionTestCases < Test::Unit::TestCase
       names = connection.role_names
       assert_equal 'READER', names[0]
       assert_equal 'WRITER', names[1]
+    end
+  end
+  
+  def test_role_names_downcased
+    sql_schema = <<-END
+      create role reader;
+      create role writer;
+    END
+    Database.create(@parms.merge(:downcase_names => true)) do |connection|
+      connection.execute_script(sql_schema)
+      names = connection.role_names
+      assert_equal 'reader', names[0]
+      assert_equal 'writer', names[1]
     end
   end
   
@@ -310,6 +364,21 @@ class ConnectionTestCases < Test::Unit::TestCase
       connection.execute(sql_schema)
       names = connection.procedure_names
       assert_equal 'PLUSONE', names[0]
+    end
+  end
+
+  def test_procedure_names_downcased
+    sql_schema = <<-END_SQL
+      CREATE PROCEDURE PLUSONE(NUM1 INTEGER) RETURNS (NUM2 INTEGER) AS
+      BEGIN
+        NUM2 = NUM1 + 1;
+        SUSPEND;
+      END;
+    END_SQL
+    Database.create(@parms.merge(:downcase_names => true)) do |connection|
+      connection.execute(sql_schema)
+      names = connection.procedure_names
+      assert_equal 'plusone', names[0]
     end
   end
 
@@ -332,6 +401,9 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert indexes.keys.include?('FK_DETAIL_MASTER_ID')
       assert indexes.keys.include?('IX_MASTER_NAME1')
       assert indexes.keys.include?('IX_DETAIL_ID_DESC')
+      
+      assert indexes['PK_MASTER'].columns.include?('ID')
+      assert indexes['PK_DETAIL'].columns.include?('ID')
 
       master_indexes = indexes.values.select {|ix| ix.table_name == 'MASTER' }
       assert_equal 2, master_indexes.size
@@ -359,6 +431,31 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert !indexes['IX_DETAIL_ID_DESC'].unique
       assert indexes['IX_DETAIL_ID_DESC'].descending      
       
+      connection.drop
+    end
+  end
+
+  def test_index_names_downcased
+    sql_schema = <<-END
+      CREATE TABLE MASTER (ID INT NOT NULL, NAME1 VARCHAR(10));
+      CREATE TABLE DETAIL (ID INT NOT NULL, MASTER_ID INT, NAME2 VARCHAR(10));
+      ALTER TABLE MASTER ADD CONSTRAINT PK_MASTER PRIMARY KEY(ID);
+      ALTER TABLE DETAIL ADD CONSTRAINT PK_DETAIL PRIMARY KEY(ID);
+      ALTER TABLE DETAIL ADD CONSTRAINT FK_DETAIL_MASTER_ID FOREIGN KEY(MASTER_ID) REFERENCES MASTER(ID);
+      CREATE UNIQUE ASCENDING INDEX IX_MASTER_NAME1 ON MASTER(NAME1);
+      CREATE DESCENDING INDEX "IX_DETAIL_ID_desc" ON DETAIL(ID);
+    END
+    Database.create(@parms.merge(:downcase_names => true)) do |connection|
+      connection.execute_script(sql_schema)
+      indexes = connection.indexes # Hash of Structs using index names as keys
+      assert_equal 5, indexes.size
+      assert indexes.keys.include?('pk_master')
+      assert indexes.keys.include?('pk_detail')
+      assert indexes.keys.include?('fk_detail_master_id')
+      assert indexes.keys.include?('ix_master_name1')
+      assert indexes.keys.include?('IX_DETAIL_ID_desc')
+      assert indexes['pk_master'].columns.include?('id'), "columns missing id"
+      assert indexes['pk_detail'].columns.include?('id'), "columns missing id"
       connection.drop
     end
   end

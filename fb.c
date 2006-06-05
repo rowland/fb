@@ -83,7 +83,7 @@ struct FbConnection {
 	VALUE cursor;
 	unsigned short dialect;
 	unsigned short db_dialect;
-	short downcase_column_names;
+	short downcase_names;
 	int dropped;
 	struct FbConnection *next;
 };
@@ -336,7 +336,7 @@ static void global_close_cursors()
 static void fb_connection_close_cursors(struct FbConnection *fb_connection)
 {
 	int i;
-	
+
 	for (i = 0; i < RARRAY(fb_connection->cursor)->len; i++) {
 		cursor_close(RARRAY(fb_connection->cursor)->ptr[i]);
 	}
@@ -950,7 +950,7 @@ static VALUE connection_transaction(int argc, VALUE *argv, VALUE self)
 
 	rb_scan_args(argc, argv, "01", &opt);
 	Data_Get_Struct(self, struct FbConnection, fb_connection);
-	
+
 	fb_connection_transaction_start(fb_connection, opt);
 
 	if (rb_block_given_p()) {
@@ -1076,7 +1076,7 @@ static VALUE connection_cursor(VALUE self)
  *   execute(sql, *args) -> Cursor or rows affected
  *   execute(sql, *args) {|cursor| } -> block result
  *
- * Allocates a +Cursor+ and executes the +sql+ statement, matching up the 
+ * Allocates a +Cursor+ and executes the +sql+ statement, matching up the
  * parameters in +args+ with the place holders in the statement, represented by ?'s.
  *
  * If the sql statement returns a result set and a block is provided, the cursor is
@@ -1121,7 +1121,7 @@ static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
  *
  * If the sql statement performs an INSERT, UPDATE or DELETE, the number of rows
  * affected is returned.  Other statements, such as schema updates, return -1.
- * 
+ *
  * If no transaction is currently active, a transaction is automatically started
  * and committed.  Otherwise, the statement executes within the context of the
  * current transaction.
@@ -1131,7 +1131,7 @@ static VALUE connection_query(int argc, VALUE *argv, VALUE self)
 	VALUE format;
 	VALUE cursor;
 	VALUE result;
-	
+
 	if (argc >= 1 && TYPE(argv[0]) == T_SYMBOL) {
 		format = argv[0];
 		argc--; argv++;
@@ -1510,11 +1510,11 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 		} else {
 			for (i = 0; i < argc; i++) {
 				obj = argv[i];
-	
+
 				/* Set the input parameters */
 				Check_Type(obj, T_ARRAY);
 				fb_cursor_set_inputparams(fb_cursor, RARRAY(obj)->len, RARRAY(obj)->ptr);
-	
+
 				/* Execute SQL statement */
 				isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, 0);
 				fb_error_check(isc_status);
@@ -1575,7 +1575,7 @@ static VALUE precision_from_sqlvar(XSQLVAR *sqlvar)
 	return Qnil;
 }
 
-static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_column_names)
+static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_names)
 {
 	long cols;
 	long count;
@@ -1590,7 +1590,7 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_column_names)
 		return Qnil;
 	}
 
-	if (downcase_column_names) {
+	if (downcase_names) {
 		re_lowercase = rb_reg_regcomp(rb_str_new2("[[:lower:]]"));
 		id_matches = rb_intern("=~");
 		id_downcase_bang = rb_intern("downcase!");
@@ -1609,7 +1609,7 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_column_names)
 		} else {
 			name = rb_tainted_str_new(var->sqlname, var->sqlname_length);
 		}
-		if (downcase_column_names && rb_funcall(re_lowercase, id_matches, 1, name) == Qnil) {
+		if (downcase_names && rb_funcall(re_lowercase, id_matches, 1, name) == Qnil) {
 			rb_funcall(name, id_downcase_bang, 0);
 		}
 		rb_str_freeze(name);
@@ -1881,7 +1881,7 @@ static long cursor_rows_affected(struct FbCursor *fb_cursor, long statement_type
 	char request[] = { isc_info_sql_records };
 	char response[64], *r;
 	long isc_status[20];
-	
+
 	isc_dsql_sql_info(isc_status, &fb_cursor->stmt, sizeof(request), request, sizeof(response), response);
 	fb_error_check(isc_status);
 	if (response[0] != isc_info_sql_records) { return -1; }
@@ -2027,7 +2027,7 @@ static VALUE cursor_execute2(VALUE args)
 		}
 
 		/* Set the description attributes */
-		fb_cursor->fields_ary = fb_cursor_fields_ary(fb_cursor->o_sqlda, fb_connection->downcase_column_names);
+		fb_cursor->fields_ary = fb_cursor_fields_ary(fb_cursor->o_sqlda, fb_connection->downcase_names);
 		fb_cursor->fields_hash = fb_cursor_fields_hash(fb_cursor->fields_ary);
 	}
 	return result;
@@ -2115,7 +2115,7 @@ static int hash_format(int argc, VALUE *argv)
  *
  * Reads and returns a single row from the open cursor in either an Array or a Hash,
  * where the column names or aliases from the query form the keys.
- * If the +downcase_column_names+ attribute of the associated connection evaluates to true,
+ * If the +downcase_names+ attribute of the associated connection evaluates to true,
  * the keys are lower case, except where the column name was mixed case to begin with.
  */
 static VALUE cursor_fetch(int argc, VALUE* argv, VALUE self)
@@ -2139,7 +2139,7 @@ static VALUE cursor_fetch(int argc, VALUE* argv, VALUE self)
  *
  * Returns the remainder of the rows from the open cursor, with each row represented
  * by either an Array or a Hash, where the column names or aliases from the query form the keys.
- * If the +downcase_column_names+ attribute of the associated connection evaluates to true,
+ * If the +downcase_names+ attribute of the associated connection evaluates to true,
  * the keys are lower case, except where the column name was mixed case to begin with.
  */
 static VALUE cursor_fetchall(int argc, VALUE* argv, VALUE self)
@@ -2173,7 +2173,7 @@ static VALUE cursor_fetchall(int argc, VALUE* argv, VALUE self)
  *
  * Iterates the rows from the open cursor, passing each one to a block in either
  * an Array or a Hash, where the column names or aliases from the query form the keys.
- * If the +downcase_column_names+ attribute of the associated connection evaluates to true,
+ * If the +downcase_names+ attribute of the associated connection evaluates to true,
  * the keys are lower case, except where the column name was mixed case to begin with.
  */
 static VALUE cursor_each(int argc, VALUE* argv, VALUE self)
@@ -2266,7 +2266,7 @@ static VALUE cursor_drop(VALUE self)
  *   fields(:hash) -> Hash
  *
  * Return an array of Field Structs or a hash indexed by field name.
- * If the +downcase_column_names+ attribute of the associated connection evaluates to true,
+ * If the +downcase_names+ attribute of the associated connection evaluates to true,
  * the keys are lower case, except where the column name was mixed case to begin with.
  */
 static VALUE cursor_fields(int argc, VALUE* argv, VALUE self)
@@ -2346,7 +2346,7 @@ static char* CONNECTION_PARMS[] = {
 	"@password",
 	"@charset",
 	"@role",
-	"@downcase_column_names",
+	"@downcase_names",
 	(char *)0
 };
 
@@ -2354,7 +2354,7 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 {
 	unsigned short dialect;
 	unsigned short db_dialect;
-	VALUE downcase_column_names;
+	VALUE downcase_names;
 	char *parm;
 	int i;
 	struct FbConnection *fb_connection;
@@ -2376,8 +2376,8 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 
 	fb_connection->dialect = dialect;
 	fb_connection->db_dialect = db_dialect;
-	downcase_column_names = rb_iv_get(db, "@downcase_column_names");
-	fb_connection->downcase_column_names = (downcase_column_names != Qnil && downcase_column_names != Qfalse);
+	downcase_names = rb_iv_get(db, "@downcase_names");
+	fb_connection->downcase_names = RTEST(downcase_names);
 
 	for (i = 0; parm = CONNECTION_PARMS[i]; i++) {
 		rb_iv_set(connection, parm, rb_iv_get(db, parm));
@@ -2393,10 +2393,24 @@ static VALUE connection_names(VALUE self, char *sql)
 	VALUE cursor = connection_execute(1, &query, self);
 	VALUE names = rb_ary_new();
 	ID id_rstrip_bang = rb_intern("rstrip!");
+	struct FbConnection *fb_connection;
+	VALUE re_lowercase;
+	ID id_matches, id_downcase_bang;
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+
+	if (fb_connection->downcase_names) {
+		re_lowercase = rb_reg_regcomp(rb_str_new2("[[:lower:]]"));
+		id_matches = rb_intern("=~");
+		id_downcase_bang = rb_intern("downcase!");
+	}
 
 	while ((row = cursor_fetch(0, NULL, cursor)) != Qnil) {
 		VALUE name = rb_ary_entry(row, 0);
-		rb_ary_push(names, rb_funcall(name, id_rstrip_bang, 0));
+		if (fb_connection->downcase_names && rb_funcall(re_lowercase, id_matches, 1, name) == Qnil) {
+			rb_funcall(name, id_downcase_bang, 0);
+		}
+		rb_funcall(name, id_rstrip_bang, 0);
+		rb_ary_push(names, name);
 	}
 
 	cursor_close(cursor);
@@ -2465,6 +2479,17 @@ static VALUE connection_procedure_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+char *p(char *prompt, VALUE s)
+{
+	char *sz;
+	if (TYPE(s) != T_STRING) {
+		s = rb_funcall(s, rb_intern("to_s"), 0);
+	}
+	sz = StringValuePtr(s);
+	printf("%s: %s\n", prompt, sz);
+	return sz;
+}
+
 static VALUE connection_index_columns(VALUE self, VALUE index_name)
 {
 	char *sql_columns = "SELECT * "
@@ -2476,11 +2501,25 @@ static VALUE connection_index_columns(VALUE self, VALUE index_name)
 	VALUE query_parms[] = { query_columns, index_name };
 	VALUE result = connection_query(2, query_parms, self);
 	VALUE columns = rb_ary_new();
+	VALUE re_lowercase;
+	ID id_matches, id_downcase_bang;
 	int i;
+	struct FbConnection *fb_connection;
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+
+	if (fb_connection->downcase_names) {
+		re_lowercase = rb_reg_regcomp(rb_str_new2("[[:lower:]]"));
+		id_matches = rb_intern("=~");
+		id_downcase_bang = rb_intern("downcase!");
+	}
+
 	for (i = 0; i < RARRAY(result)->len; i++) {
 		VALUE row = rb_ary_entry(result, i);
 		VALUE name = rb_ary_entry(row, 1);
 		rb_funcall(name, id_rstrip_bang, 0);
+		if (fb_connection->downcase_names && rb_funcall(re_lowercase, id_matches, 1, name) == Qnil) {
+			rb_funcall(name, id_downcase_bang, 0);
+		}
 		rb_ary_push(columns, name);
 	}
 	return columns;
@@ -2501,7 +2540,18 @@ static VALUE connection_indexes(VALUE self)
 	VALUE query_indexes = rb_str_new2(sql_indexes);
 	VALUE ary_indexes = connection_query(1, &query_indexes, self);
 	VALUE indexes = rb_hash_new();
+	VALUE re_lowercase;
+	ID id_matches, id_downcase_bang;
 	int i;
+	struct FbConnection *fb_connection;
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+
+	if (fb_connection->downcase_names) {
+		re_lowercase = rb_reg_regcomp(rb_str_new2("[[:lower:]]"));
+		id_matches = rb_intern("=~");
+		id_downcase_bang = rb_intern("downcase!");
+	}
+
 	for (i = 0; i < RARRAY(ary_indexes)->len; i++) {
 		VALUE index_struct;
 		VALUE row = rb_ary_entry(ary_indexes, i);
@@ -2513,13 +2563,23 @@ static VALUE connection_indexes(VALUE self)
 
 		rb_funcall(table_name, id_rstrip_bang, 0);
 		rb_funcall(index_name, id_rstrip_bang, 0);
+
+		if (fb_connection->downcase_names) {
+			if (rb_funcall(re_lowercase, id_matches, 1, table_name) == Qnil) {
+				rb_funcall(table_name, id_downcase_bang, 0);
+			}
+			if (rb_funcall(re_lowercase, id_matches, 1, index_name) == Qnil) {
+				rb_funcall(index_name, id_downcase_bang, 0);
+			}
+		}
+
 		rb_str_freeze(table_name);
 		rb_str_freeze(index_name);
-		
+
 		unique = RTEST(unique) ? Qtrue : Qfalse;
 		descending = RTEST(descending) ? Qtrue : Qfalse;
-		
-		index_struct = rb_struct_new(rb_sFbIndex, table_name, index_name, unique, descending, columns, NULL);
+
+		index_struct = rb_struct_new(rb_sFbIndex, table_name, index_name, unique, descending, columns);
 		rb_hash_aset(indexes, index_name, index_struct);
 	}
 	return indexes;
@@ -2602,7 +2662,7 @@ static void check_page_size(int page_size)
  * :password:: database password (default: 'masterkey')
  * :charset:: character set to be used with the connection (default: 'NONE')
  * :role:: database role to connect using (default: nil)
- * :downcase_column_names:: Column names are reported in lowercase, unless they were originally mixed case (default: nil).
+ * :downcase_names:: Column names are reported in lowercase, unless they were originally mixed case (default: nil).
  * :page_size:: page size to use when creating a database (default: 1024)
  */
 static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
@@ -2623,7 +2683,7 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 		rb_iv_set(self, "@password", default_string(parms, "password", "masterkey"));
 		rb_iv_set(self, "@charset", default_string(parms, "charset", "NONE"));
 		rb_iv_set(self, "@role", rb_hash_aref(parms, ID2SYM(rb_intern("role"))));
-		rb_iv_set(self, "@downcase_column_names", rb_hash_aref(parms, ID2SYM(rb_intern("downcase_column_names"))));
+		rb_iv_set(self, "@downcase_names", rb_hash_aref(parms, ID2SYM(rb_intern("downcase_names"))));
 		rb_iv_set(self, "@page_size", default_int(parms, "page_size", 1024));
 	}
 	return self;
@@ -2780,7 +2840,7 @@ void Init_fb()
 	rb_define_attr(rb_cFbDatabase, "password", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "charset", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "role", 1, 1);
-	rb_define_attr(rb_cFbDatabase, "downcase_column_names", 1, 1);
+	rb_define_attr(rb_cFbDatabase, "downcase_names", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "page_size", 1, 1);
     rb_define_method(rb_cFbDatabase, "create", database_create, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "create", database_s_create, -1);
@@ -2795,10 +2855,10 @@ void Init_fb()
 	rb_define_attr(rb_cFbConnection, "password", 1, 1);
 	rb_define_attr(rb_cFbConnection, "charset", 1, 1);
 	rb_define_attr(rb_cFbConnection, "role", 1, 1);
-	rb_define_attr(rb_cFbConnection, "downcase_column_names", 1, 1);
+	rb_define_attr(rb_cFbConnection, "downcase_names", 1, 1);
 	rb_define_method(rb_cFbConnection, "to_s", connection_to_s, 0);
 	rb_define_method(rb_cFbConnection, "execute", connection_execute, -1);
-	rb_define_method(rb_cFbConnection, "query", connection_query, -1);	
+	rb_define_method(rb_cFbConnection, "query", connection_query, -1);
 	rb_define_method(rb_cFbConnection, "transaction", connection_transaction, -1);
 	rb_define_method(rb_cFbConnection, "transaction_started", connection_transaction_started, 0);
 	rb_define_method(rb_cFbConnection, "commit", connection_commit, 0);
@@ -2839,6 +2899,6 @@ void Init_fb()
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
 	rb_define_method(rb_eFbError, "error_code", error_error_code, 0);
 
-	rb_sFbField = rb_struct_define("Field", "name", "sql_type", "sql_subtype", "display_size", "internal_size", "precision", "scale", "nullable", "type_code", NULL);
-	rb_sFbIndex = rb_struct_define(NULL, "table_name", "index_name", "unique", "descending", "columns", NULL);
+	rb_sFbField = rb_struct_define("FbField", "name", "sql_type", "sql_subtype", "display_size", "internal_size", "precision", "scale", "nullable", "type_code", NULL);
+	rb_sFbIndex = rb_struct_define("FbIndex", "table_name", "index_name", "unique", "descending", "columns", NULL);
 }
