@@ -10,7 +10,7 @@
 require 'fb'
 
 # The library contains on module, Fb.
-# Within Fb are four primary classes, Database, Connection, Cursor and Error.
+# Within Fb are four primary classes, Fb::Database, Fb::Connection, Fb::Cursor and Fb::Error.
 # For convenience, we'll include these classes into the current context.
 
 include Fb

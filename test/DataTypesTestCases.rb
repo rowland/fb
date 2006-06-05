@@ -1,5 +1,5 @@
 require 'test/unit'
-require 'test/unit/FbTestCases'
+require 'test/FbTestCases'
 require 'fb.so'
 include Fb
 

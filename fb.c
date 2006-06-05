@@ -2536,12 +2536,13 @@ static void check_page_size(int page_size)
  *   Database.new(options) -> Database
  *
  * Initialize Database with Hash of values:
- *   :database: Full Firebird connection string, e.g. 'localhost:/var/fbdata/drivertest.fdb' (required)
- *   :username: database username (default: 'sysdba')
- *   :password: database password (default: 'masterkey')
- *   :charset: character set to be used with the connection (default: 'NONE')
- *   :role: database role to connect using (default: nil)
- *   :page_size: page size to use when creating a database (default: 1024)
+ * :database:: Full Firebird connection string, e.g. 'localhost:/var/fbdata/drivertest.fdb' (required)
+ * :username:: database username (default: 'sysdba')
+ * :password:: database password (default: 'masterkey')
+ * :charset:: character set to be used with the connection (default: 'NONE')
+ * :role:: database role to connect using (default: nil)
+ * :downcase_column_names:: Column names are reported in lowercase, unless they were originally mixed case (default: nil).
+ * :page_size:: page size to use when creating a database (default: 1024)
  */
 static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 {
@@ -2765,13 +2766,13 @@ void Init_fb()
 	rb_cFbSqlType = rb_define_class_under(rb_mFb, "SqlType", rb_cData);
 	rb_define_singleton_method(rb_cFbSqlType, "from_code", sql_type_from_code, 2);
 
-	/*
-	rb_cFbGlobal = rb_define_class_under(rb_mFb, "Global", rb_cData);
-	rb_define_singleton_method(rb_cFbGlobal, "transaction", global_transaction, -1);
-	rb_define_singleton_method(rb_cFbGlobal, "transaction_started", global_transaction_started, 0);
-	rb_define_singleton_method(rb_cFbGlobal, "commit", global_commit, 0);
-	rb_define_singleton_method(rb_cFbGlobal, "rollback", global_rollback, 0);
-	*/
+/*
+//	rb_cFbGlobal = rb_define_class_under(rb_mFb, "Global", rb_cData);
+//	rb_define_singleton_method(rb_cFbGlobal, "transaction", global_transaction, -1);
+//	rb_define_singleton_method(rb_cFbGlobal, "transaction_started", global_transaction_started, 0);
+//	rb_define_singleton_method(rb_cFbGlobal, "commit", global_commit, 0);
+//	rb_define_singleton_method(rb_cFbGlobal, "rollback", global_rollback, 0);
+*/
 
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
 	rb_define_method(rb_eFbError, "error_code", error_error_code, 0);
