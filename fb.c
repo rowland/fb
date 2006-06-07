@@ -122,7 +122,7 @@ static int connection_count = 0;
 
 #define	ALIGN(n, b)	((n + b - 1) & ~(b - 1))
 #define	UPPER(c)	(((c) >= 'a' && (c)<= 'z') ? (c) - 'a' + 'A' : (c))
-#define	FREE(p)		if (p)	{ free(p); p = 0; }
+#define	FREE(p)		if (p)	{ xfree(p); p = 0; }
 #define	SETNULL(p)	if (p && strlen(p) == 0)	{ p = 0; }
 
 static long calculate_buffsize(XSQLDA *sqlda)
@@ -300,7 +300,7 @@ static XSQLDA* sqlda_alloc(long cols)
 	sqlda->version = SQLDA_VERSION1;
 #endif
 	sqlda->sqln = cols;
-	sqlda->sqld = cols;
+	sqlda->sqld = 0;
 	return sqlda;
 }
 
@@ -412,7 +412,7 @@ static void fb_connection_free(struct FbConnection *fb_connection)
 	if (fb_connection->db) {
 		fb_connection_disconnect_warn(fb_connection);
 	}
-	free(fb_connection);
+	xfree(fb_connection);
 }
 
 static struct FbConnection* fb_connection_check_retrieve(VALUE data)
@@ -762,7 +762,7 @@ static char* trans_parseopts(VALUE opt, int *tpb_len)
 	return tpb;
 
 error:
-	free(tpb);
+	xfree(tpb);
 	rb_raise(rb_eFbError, desc);
 }
 
@@ -814,7 +814,7 @@ static void global_transaction_start(VALUE opt, int argc, VALUE *argv)
 	}
 
 	isc_start_multiple(isc_status, &global_transact, n, teb_vec);
-	if (tpb) free(tpb);
+	xfree(tpb);
 	fb_error_check(isc_status);
 }
 
@@ -911,7 +911,7 @@ static void fb_connection_transaction_start(struct FbConnection *fb_connection, 
 	}
 
 	isc_start_transaction(isc_status, &fb_connection->transact, 1, &fb_connection->db, tpb_len, tpb);
-	if (tpb) free(tpb);
+	xfree(tpb);
 	fb_error_check(isc_status);
 }
 
@@ -1107,6 +1107,8 @@ static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
    		} else {
 			return cursor;
    		}
+	} else {
+		cursor_drop(cursor);
 	}
 	return val;
 }
@@ -1234,7 +1236,6 @@ static void fb_cursor_drop(struct FbCursor *fb_cursor)
 	}
 	isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_drop);
 	fb_error_check(isc_status);
-	fb_cursor->stmt = 0;
 }
 
 static void fb_cursor_drop_warn(struct FbCursor *fb_cursor)
@@ -1246,7 +1247,6 @@ static void fb_cursor_drop_warn(struct FbCursor *fb_cursor)
 	}
 	isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_drop);
 	fb_error_check_warn(isc_status);
-	fb_cursor->stmt = 0;
 }
 
 static void fb_cursor_mark(struct FbCursor *fb_cursor)
@@ -1261,11 +1261,11 @@ static void fb_cursor_free(struct FbCursor *fb_cursor)
 	if (fb_cursor->stmt) {
 		fb_cursor_drop_warn(fb_cursor);
 	}
-	free(fb_cursor->i_sqlda);
-	free(fb_cursor->o_sqlda);
-	free(fb_cursor->i_buffer);
-	free(fb_cursor->o_buffer);
-	free(fb_cursor);
+	xfree(fb_cursor->i_sqlda);
+	xfree(fb_cursor->o_sqlda);
+	xfree(fb_cursor->i_buffer);
+	xfree(fb_cursor->o_buffer);
+	xfree(fb_cursor);
 }
 
 struct time_object {
@@ -1516,7 +1516,7 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 				fb_cursor_set_inputparams(fb_cursor, RARRAY(obj)->len, RARRAY(obj)->ptr);
 
 				/* Execute SQL statement */
-				isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, 0);
+				isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, NULL);
 				fb_error_check(isc_status);
 			}
 		}
@@ -1525,7 +1525,7 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 		fb_cursor_set_inputparams(fb_cursor, argc, argv);
 
 		/* Execute SQL statement */
-		isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, 0);
+		isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, NULL);
 		fb_error_check(isc_status);
 	}
 }
@@ -1966,7 +1966,7 @@ static VALUE cursor_execute2(VALUE args)
 	/* Get the number of parameters and reallocate the SQLDA */
 	in_params = fb_cursor->i_sqlda->sqld;
 	if (fb_cursor->i_sqlda->sqln < in_params) {
-		free(fb_cursor->i_sqlda);
+		xfree(fb_cursor->i_sqlda);
 		fb_cursor->i_sqlda = sqlda_alloc(in_params);
 		/* Describe again */
 		isc_dsql_describe_bind(isc_status, &fb_cursor->stmt, 1, fb_cursor->i_sqlda);
@@ -1993,7 +1993,7 @@ static VALUE cursor_execute2(VALUE args)
 		} else if (in_params) {
 			fb_cursor_execute_withparams(fb_cursor, RARRAY(args)->len, RARRAY(args)->ptr);
 		} else {
-			isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, 0, 0);
+			isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, NULL, NULL);
 			fb_error_check(isc_status);
 		}
 		rows_affected = cursor_rows_affected(fb_cursor, statement);
@@ -2003,7 +2003,7 @@ static VALUE cursor_execute2(VALUE args)
 		/* Get the number of columns and reallocate the SQLDA */
 		cols = fb_cursor->o_sqlda->sqld;
 		if (fb_cursor->o_sqlda->sqln < cols) {
-			free(fb_cursor->o_sqlda);
+			xfree(fb_cursor->o_sqlda);
 			fb_cursor->o_sqlda = sqlda_alloc(cols);
 			/* Describe again */
 			isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, fb_cursor->o_sqlda);
@@ -2015,7 +2015,7 @@ static VALUE cursor_execute2(VALUE args)
 		}
 
 		/* Open cursor */
-		isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, in_params ? fb_cursor->i_sqlda : 0, 0);
+		isc_dsql_execute2(isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, in_params ? fb_cursor->i_sqlda : NULL, NULL);
 		fb_error_check(isc_status);
 		fb_cursor->open = Qtrue;
 
@@ -2217,6 +2217,8 @@ static VALUE cursor_close(VALUE self)
 	/* Close the cursor */
 	if (fb_cursor->stmt) {
 		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
+		fb_error_check_warn(isc_status);
+		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_drop);
 		fb_error_check(isc_status);
 		fb_cursor->open = Qfalse;
 		if (fb_connection->transact == fb_cursor->auto_transact) {
@@ -2227,7 +2229,6 @@ static VALUE cursor_close(VALUE self)
 	}
 	fb_cursor->fields_ary = Qnil;
 	fb_cursor->fields_hash = Qnil;
-
 	return Qnil;
 }
 
@@ -2769,7 +2770,7 @@ static VALUE database_connect(VALUE self)
 	Check_Type(database, T_STRING);
 	dbp = connection_create_dbp(self, &length);
 	isc_attach_database(isc_status, 0, STR2CSTR(database), &handle, length, dbp);
-	free(dbp);
+	xfree(dbp);
 	fb_error_check(isc_status);
 	{
 		VALUE connection = connection_create(handle, self);
