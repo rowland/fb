@@ -1,6 +1,8 @@
 require 'test/unit'
 require 'test/FbTestCases'
 require 'fb.so'
+require 'date'
+
 include Fb
 
 class DataTypesTestCases < Test::Unit::TestCase
@@ -47,7 +49,7 @@ class DataTypesTestCases < Test::Unit::TestCase
   end
   
   def gen_dt(i)
-    Time.local(2000 + i)
+    Date.civil(2000, i+1, i+1)
   end
   
   def gen_tm(i)
@@ -250,11 +252,11 @@ class DataTypesTestCases < Test::Unit::TestCase
             connection.execute(sql_insert, Time.now)
           end
         elsif cols[i] == 'DT'
-          assert_raise TypeError do
-            connection.execute(sql_insert, "2006/1/1")
+          assert_raise ArgumentError do
+            connection.execute(sql_insert, Date)
           end
-          assert_raise TypeError do
-            connection.execute(sql_insert, 10000)
+          assert_raise ArgumentError do
+            connection.execute(sql_insert, 2006)
           end
         elsif cols[i] == 'TM'
           assert_raise TypeError do

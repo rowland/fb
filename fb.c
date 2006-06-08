@@ -53,6 +53,8 @@ static VALUE rb_eFbError;
 static VALUE rb_sFbField;
 static VALUE rb_sFbIndex;
 
+static VALUE rb_cDate;
+
 static char isc_info_stmt[] = { isc_info_sql_stmt_type };
 static char isc_info_buff[16];
 static char isc_tpb_0[] = {
@@ -174,6 +176,36 @@ static VALUE fb_mktime(struct tm *tm)
 		rb_cTime, rb_intern("utc"), 6,
 		INT2FIX(tm->tm_year), INT2FIX(tm->tm_mon), INT2FIX(tm->tm_mday),
 		INT2FIX(tm->tm_hour), INT2FIX(tm->tm_min), INT2FIX(tm->tm_sec));
+}
+
+static VALUE fb_mkdate(struct tm *tm)
+{
+	return rb_funcall(
+		rb_cDate, rb_intern("civil"), 3,
+		INT2FIX(1900 + tm->tm_year), INT2FIX(tm->tm_mon + 1), INT2FIX(tm->tm_mday));		
+}
+
+static int responds_like_date(VALUE obj)
+{
+	return rb_respond_to(obj, rb_intern("year")) && 
+		rb_respond_to(obj, rb_intern("month")) && 
+		rb_respond_to(obj, rb_intern("day"));
+}
+static void tm_from_date(struct tm *tm, VALUE date)
+{
+	VALUE year, month, day;
+
+	if (!responds_like_date(date)) {
+		VALUE s = rb_funcall(date, rb_intern("to_s"), 0);
+		date = rb_funcall(rb_cDate, rb_intern("parse"), 1, s);
+	}
+	year = rb_funcall(date, rb_intern("year"), 0);
+	month = rb_funcall(date, rb_intern("month"), 0);
+	day = rb_funcall(date, rb_intern("day"), 0);
+	memset(tm, 0, sizeof(struct tm));
+	tm->tm_year = FIX2INT(year) - 1900;
+	tm->tm_mon = FIX2INT(month) - 1;
+	tm->tm_mday = FIX2INT(day);
 }
 
 static VALUE fb_sql_type_from_code(int code, int subtype)
@@ -1300,6 +1332,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 	char *p;
 	long length;
 	struct time_object *tobj;
+	struct tm tms;
 
 	long isc_status[20];
 
@@ -1450,8 +1483,8 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_TYPE_DATE :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
-					GetTimeval(obj, tobj);
-					isc_encode_sql_date(&tobj->tm, (ISC_DATE *)var->sqldata);
+					tm_from_date(&tms, obj);
+					isc_encode_sql_date(&tms, (ISC_DATE *)var->sqldata);
 					offset += alignment;
 					break;
 
@@ -1819,9 +1852,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 				case SQL_TYPE_DATE:
 					isc_decode_sql_date((ISC_DATE *)var->sqldata, &tms);
-					t = mktime(&tms);
-					if (t < 0) t = 0;
-					val = rb_time_new(t, 0);
+					val = fb_mkdate(&tms);
 					break;
 
 				case SQL_BLOB:
@@ -2902,4 +2933,7 @@ void Init_fb()
 
 	rb_sFbField = rb_struct_define("FbField", "name", "sql_type", "sql_subtype", "display_size", "internal_size", "precision", "scale", "nullable", "type_code", NULL);
 	rb_sFbIndex = rb_struct_define("FbIndex", "table_name", "index_name", "unique", "descending", "columns", NULL);
+	
+	rb_require("date");
+	rb_cDate = rb_const_get(rb_cObject, rb_intern("Date"));
 }
