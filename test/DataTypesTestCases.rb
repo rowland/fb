@@ -189,7 +189,7 @@ class DataTypesTestCases < Test::Unit::TestCase
         sql_insert = "INSERT INTO TEST_#{cols[i]} (VAL) VALUES (?);"
         if cols[i] == 'I'
           assert_raise TypeError do
-            connection.execute(sql_insert, "five")
+            connection.execute(sql_insert, {:five => "five"})
           end
           assert_raise TypeError do
             connection.execute(sql_insert, Time.now)
@@ -199,7 +199,7 @@ class DataTypesTestCases < Test::Unit::TestCase
           end
         elsif cols[i] == 'SI'
           assert_raise TypeError do
-            connection.execute(sql_insert, "five")
+            connection.execute(sql_insert, {:five => "five"})
           end
           assert_raise TypeError do
             connection.execute(sql_insert, Time.now)
@@ -209,7 +209,7 @@ class DataTypesTestCases < Test::Unit::TestCase
           end
         elsif cols[i] == 'BI'
           assert_raise TypeError do
-            connection.execute(sql_insert, "five")
+            connection.execute(sql_insert, {:five => "five"})
           end
           assert_raise TypeError do
             connection.execute(sql_insert, Time.now)
@@ -219,14 +219,14 @@ class DataTypesTestCases < Test::Unit::TestCase
           end
         elsif cols[i] == 'F'
           assert_raise TypeError do
-            connection.execute(sql_insert, "five")
+            connection.execute(sql_insert, {:five => "five"})
           end
           assert_raise RangeError do
             connection.execute(sql_insert, 10 ** 39)
           end
         elsif cols[i] == 'D'
           assert_raise TypeError do
-            connection.execute(sql_insert, "five")
+            connection.execute(sql_insert, {:five => "five"})
           end
         elsif cols[i] == 'VC'
           assert_raise RangeError do
@@ -260,18 +260,118 @@ class DataTypesTestCases < Test::Unit::TestCase
           end
         elsif cols[i] == 'TM'
           assert_raise TypeError do
-            connection.execute(sql_insert, "2006/1/1")
+            connection.execute(sql_insert, {:date => "2006/1/1"})
           end
           assert_raise TypeError do
             connection.execute(sql_insert, 10000)
           end
         elsif cols[i] ==  'TS'
           assert_raise TypeError do
-            connection.execute(sql_insert, "2006/1/1")
+            connection.execute(sql_insert, 5.5)
           end
           assert_raise TypeError do
             connection.execute(sql_insert, 10000)
           end
+        end
+      end
+      connection.drop
+    end
+  end
+
+  def test_insert_correct_types
+    cols = %w{ I SI BI F D C C10 VC VC10 VC10000 DT TM TS }
+    types = %w{ INTEGER SMALLINT BIGINT FLOAT DOUBLE\ PRECISION CHAR CHAR(10) VARCHAR(1) VARCHAR(10) VARCHAR(10000) DATE TIME TIMESTAMP }
+    sql_schema = "";
+    assert_equal cols.size, types.size
+    cols.size.times do |i|
+      sql_schema << "CREATE TABLE TEST_#{cols[i]} (VAL #{types[i]});\n"
+    end
+    Database.create(@parms) do |connection|
+      connection.execute_script(sql_schema)
+      cols.size.times do |i|
+        sql_insert = "INSERT INTO TEST_#{cols[i]} (VAL) VALUES (?);"
+        sql_select = "SELECT * FROM TEST_#{cols[i]};"
+        if cols[i] == 'I'
+          connection.execute(sql_insert, 500_000)
+          connection.execute(sql_insert, "500_000")
+          vals = connection.query(sql_select)
+          assert_equal 500_000, vals[0][0]
+          assert_equal 500_000, vals[1][0]
+        elsif cols[i] == 'SI'
+          connection.execute(sql_insert, 32_123)
+          connection.execute(sql_insert, "32_123")
+          vals = connection.query(sql_select)
+          assert_equal 32_123, vals[0][0]
+          assert_equal 32_123, vals[1][0]
+        elsif cols[i] == 'BI'
+          connection.execute(sql_insert, 5_000_000_000)
+          connection.execute(sql_insert, "5_000_000_000")
+          vals = connection.query(sql_select)
+          assert_equal 5_000_000_000, vals[0][0]
+          assert_equal 5_000_000_000, vals[1][0]
+        elsif cols[i] == 'F'
+          connection.execute(sql_insert, 5.75)
+          connection.execute(sql_insert, "5.75")
+          vals = connection.query(sql_select)
+          assert_equal 5.75, vals[0][0]
+          assert_equal 5.75, vals[1][0]
+        elsif cols[i] == 'D'
+          connection.execute(sql_insert, 12345.12345)
+          connection.execute(sql_insert, "12345.12345")
+          vals = connection.query(sql_select)
+          assert_equal 12345.12345, vals[0][0]
+          assert_equal 12345.12345, vals[1][0]
+        elsif cols[i] == 'VC'
+          connection.execute(sql_insert, "5")
+          connection.execute(sql_insert, 5)
+          vals = connection.query(sql_select)
+          assert_equal "5", vals[0][0]
+          assert_equal "5", vals[1][0]
+        elsif cols[i] ==  'VC10'
+          connection.execute(sql_insert, "1234567890")
+          connection.execute(sql_insert, 1234567890)
+          vals = connection.query(sql_select)
+          assert_equal "1234567890", vals[0][0]
+          assert_equal "1234567890", vals[1][0]
+        elsif cols[i].include?('VC10000')
+          connection.execute(sql_insert, "1" * 100)
+          connection.execute(sql_insert, ("1" * 100).to_i)
+          vals = connection.query(sql_select)
+          assert_equal "1" * 100, vals[0][0]
+          assert_equal "1" * 100, vals[1][0]
+        elsif cols[i] == 'C'
+          connection.execute(sql_insert, "5")
+          connection.execute(sql_insert, 5)
+          vals = connection.query(sql_select)
+          assert_equal "5", vals[0][0]
+          assert_equal "5", vals[1][0]
+        elsif cols[i] == 'C10'
+          connection.execute(sql_insert, "1234567890")
+          connection.execute(sql_insert, 1234567890)
+          vals = connection.query(sql_select)
+          assert_equal "1234567890", vals[0][0]
+          assert_equal "1234567890", vals[1][0]
+        elsif cols[i] == 'DT'
+          connection.execute(sql_insert, Date.civil(2000,2,2))
+          connection.execute(sql_insert, "2000/2/2")
+          connection.execute(sql_insert, "2000-2-2")
+          vals = connection.query(sql_select)
+          assert_equal Date.civil(2000,2,2), vals[0][0]
+          assert_equal Date.civil(2000,2,2), vals[1][0]
+        elsif cols[i] == 'TM'
+          connection.execute(sql_insert, Time.utc(2000,1,1,2,22,22))
+          connection.execute(sql_insert, "2000/1/1 2:22:22")
+          connection.execute(sql_insert, "2000-1-1 2:22:22")
+          vals = connection.query(sql_select)
+          assert_equal Time.utc(2000,1,1,2,22,22), vals[0][0]
+          assert_equal Time.utc(2000,1,1,2,22,22), vals[1][0]
+        elsif cols[i] ==  'TS'
+          connection.execute(sql_insert, Time.local(2006,6,6,3,33,33))
+          connection.execute(sql_insert, "2006/6/6 3:33:33")
+          connection.execute(sql_insert, "2006-6-6 3:33:33")
+          vals = connection.query(sql_select)
+          assert_equal Time.local(2006,6,6,3,33,33), vals[0][0]
+          assert_equal Time.local(2006,6,6,3,33,33), vals[1][0]
         end
       end
       connection.drop

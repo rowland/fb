@@ -170,6 +170,16 @@ static VALUE fb_error_msg(long *isc_status)
 	return result;
 }
 
+struct time_object {
+    struct timeval tv;
+    struct tm tm;
+    int gmt;
+    int tm_got;
+};
+
+#define GetTimeval(obj, tobj) \
+    Data_Get_Struct(obj, struct time_object, tobj)
+
 static VALUE fb_mktime(struct tm *tm)
 {
 	return rb_funcall(
@@ -206,6 +216,49 @@ static void tm_from_date(struct tm *tm, VALUE date)
 	tm->tm_year = FIX2INT(year) - 1900;
 	tm->tm_mon = FIX2INT(month) - 1;
 	tm->tm_mday = FIX2INT(day);
+}
+
+static void tm_from_timestamp(struct tm *tm, VALUE obj)
+{
+	struct time_object *tobj;
+
+	if (!rb_obj_is_kind_of(obj, rb_cTime) && rb_respond_to(obj, rb_intern("to_str")))
+	{
+		VALUE s = rb_funcall(obj, rb_intern("to_str"), 0);
+		obj = rb_funcall(rb_cTime, rb_intern("parse"), 1, s);
+	}
+
+	GetTimeval(obj, tobj);
+	*tm = tobj->tm;
+}
+
+static VALUE long_from_obj(VALUE obj)
+{
+	ID id_to_str = rb_intern("to_str");
+	if (TYPE(obj) != T_FIXNUM && rb_respond_to(obj, id_to_str))
+	{
+		VALUE s = rb_funcall(obj, id_to_str, 0);
+		obj = rb_funcall(s, rb_intern("to_i"), 0);
+	}
+	return obj;
+}
+
+static VALUE ll_from_obj(VALUE obj)
+{
+	if (TYPE(obj) == T_STRING)
+	{
+		obj = rb_funcall(obj, rb_intern("to_i"), 0);
+	}
+	return obj;
+}
+
+static VALUE double_from_obj(VALUE obj)
+{
+	if (TYPE(obj) == T_STRING)
+	{
+		obj = rb_funcall(obj, rb_intern("to_f"), 0);
+	}
+	return obj;
 }
 
 static VALUE fb_sql_type_from_code(int code, int subtype)
@@ -1300,16 +1353,6 @@ static void fb_cursor_free(struct FbCursor *fb_cursor)
 	xfree(fb_cursor);
 }
 
-struct time_object {
-    struct timeval tv;
-    struct tm tm;
-    int gmt;
-    int tm_got;
-};
-
-#define GetTimeval(obj, tobj) \
-    Data_Get_Struct(obj, struct time_object, tobj)
-
 static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALUE *argv)
 {
 	struct FbConnection *fb_connection;
@@ -1388,6 +1431,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_SHORT :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
+					obj = long_from_obj(obj);
 					lvalue = NUM2LONG(obj);
 					if (lvalue < SHRT_MIN || lvalue > SHRT_MAX) {
 						rb_raise(rb_eRangeError, "short integer overflow");
@@ -1399,6 +1443,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_LONG :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
+					obj = long_from_obj(obj);
 					lvalue = NUM2LONG(obj);
 					*(long *)var->sqldata = lvalue;
 					offset += alignment;
@@ -1407,6 +1452,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_FLOAT :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
+					obj = double_from_obj(obj);
 					dvalue = NUM2DBL(obj);
 					if (dvalue >= 0.0) {
 						dcheck = dvalue;
@@ -1423,6 +1469,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_DOUBLE :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
+					obj = double_from_obj(obj);
 					dvalue = NUM2DBL(obj);
 					*(double *)var->sqldata = dvalue;
 					offset += alignment;
@@ -1431,6 +1478,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_INT64 :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
+					obj = ll_from_obj(obj);
 					*(ISC_INT64 *)var->sqldata = NUM2LL(obj);
 					offset += alignment;
 					break;
@@ -1467,16 +1515,16 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_TIMESTAMP :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
-					GetTimeval(obj, tobj);
-					isc_encode_timestamp(&tobj->tm, (ISC_TIMESTAMP *)var->sqldata);
+					tm_from_timestamp(&tms, obj);
+					isc_encode_timestamp(&tms, (ISC_TIMESTAMP *)var->sqldata);
 					offset += alignment;
 					break;
 
 				case SQL_TYPE_TIME :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
-					GetTimeval(obj, tobj);
-					isc_encode_sql_time(&tobj->tm, (ISC_TIME *)var->sqldata);
+					tm_from_timestamp(&tms, obj);
+					isc_encode_sql_time(&tms, (ISC_TIME *)var->sqldata);
 					offset += alignment;
 					break;
 
