@@ -17,7 +17,8 @@
 # * Volunteers?
 require 'mkmf'
 
-libs = %w/ gdslib gds /  # InterBase library
+#libs = %w/ gdslib gds /  # InterBase library
+libs = []
 
 fbclientlib =  # Firebird library
   case RUBY_PLATFORM
