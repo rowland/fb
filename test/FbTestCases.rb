@@ -3,7 +3,11 @@ include FileUtils
 
 module FbTestCases
   def setup
-    @db_file = (RUBY_PLATFORM =~ /win32/) ? 'c:/var/fbdata/drivertest.fdb' : '/var/fbdata/drivertest.fdb'
+    @db_file = case RUBY_PLATFORM
+      when /win32/ then 'c:/var/fbdata/drivertest.fdb'
+      when /darwin/ then '/Users/brent/fbdata'
+      else '/var/fbdata/drivertest.fdb'
+    end
     @db_host = 'localhost'
     @parms = {
       :database => "#{@db_host}:#{@db_file}",
