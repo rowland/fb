@@ -17,29 +17,33 @@
 # * Volunteers?
 require 'mkmf'
 
-#libs = %w/ gdslib gds /  # InterBase library
-libs = []
+libs = %w/ gdslib gds fbclient /  # InterBase library
 
-fbclientlib =  # Firebird library
-  case RUBY_PLATFORM
+case RUBY_PLATFORM
   when /bccwin32/
-    "fbclient_bor"
+    libs.push "fbclient_bor"
   when /mswin32/
-    "fbclient_ms"
-  else
-    "fbclient"
-  end
-libs.push fbclientlib
+    $CFLAGS  = $CFLAGS + " -DOS_WIN32"
+    libs.push "fbclient_ms"
+  when /darwin/
+    #$CFLAGS  = $CFLAGS + " -DOS_UNIX"
+    $CPPFLAGS += " -I/Library/Frameworks/Firebird.framework/Headers"
+    $LDFLAGS += " -framework Firebird"
+  when /linux/
+    $CFLAGS  = $CFLAGS + " -DOS_UNIX"
+end
+
+dir_config("firebird")
 
 test_func = "isc_attach_database"
 
 # for ruby-1.8.1 mkmf
 case RUBY_PLATFORM
-when /win/
+when /mswin32/
   libs.find {|lib| have_library(lib) } and
     have_func(test_func, ["ibase.h"])
 else
   libs.find {|lib| have_library(lib, test_func) }
-end and
+end
 
 create_makefile("fb")
