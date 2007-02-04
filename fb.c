@@ -2983,5 +2983,6 @@ void Init_fb()
 	rb_sFbIndex = rb_struct_define("FbIndex", "table_name", "index_name", "unique", "descending", "columns", NULL);
 	
 	rb_require("date");
+	rb_require("time"); /* Needed as of Ruby 1.8.5 */
 	rb_cDate = rb_const_get(rb_cObject, rb_intern("Date"));
 }
