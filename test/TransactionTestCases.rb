@@ -1,6 +1,6 @@
 require 'test/unit'
 require 'test/FbTestCases'
-require 'fb.so'
+require 'fb'
 include Fb
 
 class TransactionTestCases < Test::Unit::TestCase

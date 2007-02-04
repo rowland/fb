@@ -4,7 +4,7 @@ require 'rubygems'
 spec = Gem::Specification.new do |s|
   s.name = "fb"
   s.version = "0.5.2"
-  s.date = "2006-06-07"
+  s.date = "2006-12-05"
   s.summary = "Firebird and Interbase driver"
   s.requirements = "Firebird client library fbclient.dll"
   s.require_path = '.'
@@ -15,11 +15,13 @@ spec = Gem::Specification.new do |s|
   s.has_rdoc = true
   s.extra_rdoc_files = ['README']
   s.rdoc_options << '--title' << 'Fb -- Ruby Firebird Extension' << '--main' << 'README' << '-x' << 'test'
-  s.files = ['extconf.rb', 'fb.c', 'fb.so', 'README'] + Dir.glob("test/*")
+  s.files = ['extconf.rb', 'fb.c', 'README'] + Dir.glob("test/*")
+  s.files << (PLATFORM =~ /darwin/) ? 'fb.bundle' : 'fb.so'
   s.platform = case PLATFORM
     when /win32/ then Gem::Platform::WIN32
     when /linux/ then Gem::Platform::LINUX_586
-    when /darwin/ then Gem::Platform::DARWIN
+    when /i686-darwin/ then "i686-darwin"
+    when /powerpc-darwin/ then Gem::Platform::DARWIN
   end
 end
 

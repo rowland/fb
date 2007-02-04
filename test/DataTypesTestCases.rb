@@ -1,6 +1,6 @@
 require 'test/unit'
 require 'test/FbTestCases'
-require 'fb.so'
+require 'fb'
 require 'date'
 
 include Fb
