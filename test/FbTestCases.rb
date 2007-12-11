@@ -5,7 +5,7 @@ module FbTestCases
   def setup
     @db_file = case RUBY_PLATFORM
       when /win32/ then 'c:/var/fbdata/drivertest.fdb'
-      when /darwin/ then '/Users/brent/fbdata'
+      when /darwin/ then '/var/fbdata/drivertest.fdb'
       else '/var/fbdata/drivertest.fdb'
     end
     @db_host = 'localhost'
