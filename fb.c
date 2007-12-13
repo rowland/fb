@@ -1439,7 +1439,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 							ratio *= 10;
 						obj = double_from_obj(obj);
 						dvalue = NUM2DBL(obj) * ratio;
-						lvalue = (long)dvalue;
+						lvalue = (long)(dvalue + 0.5);
 					} else {
 						obj = long_from_obj(obj);
 						lvalue = NUM2LONG(obj);
@@ -1460,7 +1460,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 							ratio *= 10;
 						obj = double_from_obj(obj);
 						dvalue = NUM2DBL(obj) * ratio;
-						lvalue = (long)dvalue;
+						lvalue = (long)(dvalue + 0.5);
 					} else {
 						obj = long_from_obj(obj);
 						lvalue = NUM2LONG(obj);
