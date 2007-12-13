@@ -1363,7 +1363,9 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 	VALUE obj;
 	long lvalue;
 	long alignment;
+	double ratio;
 	double dvalue;
+	long scnt;
 	double dcheck;
 	VARY *vary;
 	XSQLVAR *var;
@@ -1431,8 +1433,17 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_SHORT :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
-					obj = long_from_obj(obj);
-					lvalue = NUM2LONG(obj);
+					if (var->sqlscale < 0) {
+						ratio = 1;
+						for (scnt = 0; scnt > var->sqlscale; scnt--)
+							ratio *= 10;
+						obj = double_from_obj(obj);
+						dvalue = NUM2DBL(obj) * ratio;
+						lvalue = (long)dvalue;
+					} else {
+						obj = long_from_obj(obj);
+						lvalue = NUM2LONG(obj);
+					}
 					if (lvalue < SHRT_MIN || lvalue > SHRT_MAX) {
 						rb_raise(rb_eRangeError, "short integer overflow");
 					}
@@ -1443,8 +1454,17 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_LONG :
 					offset = ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
-					obj = long_from_obj(obj);
-					lvalue = NUM2LONG(obj);
+					if (var->sqlscale < 0) {
+						ratio = 1;
+						for (scnt = 0; scnt > var->sqlscale; scnt--)
+							ratio *= 10;
+						obj = double_from_obj(obj);
+						dvalue = NUM2DBL(obj) * ratio;
+						lvalue = (long)dvalue;
+					} else {
+						obj = long_from_obj(obj);
+						lvalue = NUM2LONG(obj);
+					}
 					*(long *)var->sqldata = lvalue;
 					offset += alignment;
 					break;

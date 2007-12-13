@@ -212,3 +212,7 @@ Change Log
 * Added RDoc documentation.
 * Insert, update and delete statements may be given an array of tuples for a parameter and will be executed once per tuple.
 * Rewrote README to match new API.
+
+2007-12-11
+
+* Properly scaled NUMERIC and DECIMAL types when inserting with parameters.

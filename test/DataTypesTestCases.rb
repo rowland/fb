@@ -59,7 +59,15 @@ class DataTypesTestCases < Test::Unit::TestCase
   def gen_ts(i)
     Time.local(2006, 1, 1, i, i, i)
   end
-  
+
+  def gen_n92(i)
+    i * 100
+  end
+
+  def gen_d92(i)
+    i * 100
+  end
+
   def test_insert_basic_types
     sql_schema = <<-END
       create table TEST (
@@ -75,13 +83,15 @@ class DataTypesTestCases < Test::Unit::TestCase
         VC10000 VARCHAR(10000),
         DT DATE,
         TM TIME,
-        TS TIMESTAMP);
+        TS TIMESTAMP,
+        N92 NUMERIC(9,2),
+        D92 DECIMAL(9,2));
       END
     sql_insert = <<-END
       insert into test 
-        (I, SI, BI, F, D, C, C10, VC, VC10, VC10000, DT, TM, TS) 
+        (I, SI, BI, F, D, C, C10, VC, VC10, VC10000, DT, TM, TS, N92, D92) 
         values
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       END
     sql_select = "select * from TEST order by I"
     Database.create(@parms) do |connection|
@@ -93,7 +103,8 @@ class DataTypesTestCases < Test::Unit::TestCase
             gen_i(i), gen_si(i), gen_bi(i),
             gen_f(i), gen_d(i),
             gen_c(i), gen_c10(i), gen_vc(i), gen_vc10(i), gen_vc10000(i), 
-            gen_dt(i), gen_tm(i), gen_ts(i))
+            gen_dt(i), gen_tm(i), gen_ts(i),
+            gen_n92(i), gen_d92(i))
         end
       end
       connection.execute(sql_select) do |cursor|
@@ -112,6 +123,8 @@ class DataTypesTestCases < Test::Unit::TestCase
           assert_equal gen_dt(i), row["DT"], "DATE"
           #assert_equal gen_tm(i).strftime("%H%M%S"), row["TM"].utc.strftime("%H%M%S"), "TIME"
           assert_equal gen_ts(i), row["TS"], "TIMESTAMP"
+          assert_equal gen_n92(i), row["N92"], "NUMERIC"
+          assert_equal gen_d92(i), row["D92"], "DECIMAL"
           i += 1
         end
       end
@@ -156,7 +169,7 @@ class DataTypesTestCases < Test::Unit::TestCase
       attachment = File.open(filename,"rb") do |f|
         f.read * 3
       end
-      assert (attachment.size > 150000), "Not expected size"
+      assert((attachment.size > 150000), "Not expected size")
       connection.transaction do
         3.times do |i|
           connection.execute(sql_insert, i, i.to_s, attachment);
@@ -272,6 +285,26 @@ class DataTypesTestCases < Test::Unit::TestCase
           assert_raise TypeError do
             connection.execute(sql_insert, 10000)
           end
+        elsif cols[i] ==  'N92'
+          assert_raise TypeError do
+            connection.execute(sql_insert, {:five => "five"})
+          end
+          assert_raise TypeError do
+            connection.execute(sql_insert, Time.now)
+          end
+          assert_raise RangeError do
+            connection.execute(sql_insert, 5000000000)
+          end
+        elsif cols[i] ==  'D92' 
+          assert_raise TypeError do
+            connection.execute(sql_insert, {:five => "five"})
+          end
+          assert_raise TypeError do
+            connection.execute(sql_insert, Time.now)
+          end
+          assert_raise RangeError do
+            connection.execute(sql_insert, 5000000000)
+          end
         end
       end
       connection.drop
@@ -279,8 +312,8 @@ class DataTypesTestCases < Test::Unit::TestCase
   end
 
   def test_insert_correct_types
-    cols = %w{ I SI BI F D C C10 VC VC10 VC10000 DT TM TS }
-    types = %w{ INTEGER SMALLINT BIGINT FLOAT DOUBLE\ PRECISION CHAR CHAR(10) VARCHAR(1) VARCHAR(10) VARCHAR(10000) DATE TIME TIMESTAMP }
+    cols = %w{ I SI BI F D C C10 VC VC10 VC10000 DT TM TS N92 D92 }
+    types = %w{ INTEGER SMALLINT BIGINT FLOAT DOUBLE\ PRECISION CHAR CHAR(10) VARCHAR(1) VARCHAR(10) VARCHAR(10000) DATE TIME TIMESTAMP NUMERIC(9,2) DECIMAL(9,2) }
     sql_schema = "";
     assert_equal cols.size, types.size
     cols.size.times do |i|
@@ -372,6 +405,21 @@ class DataTypesTestCases < Test::Unit::TestCase
           vals = connection.query(sql_select)
           assert_equal Time.local(2006,6,6,3,33,33), vals[0][0]
           assert_equal Time.local(2006,6,6,3,33,33), vals[1][0]
+          assert_equal Time.local(2006,6,6,3,33,33), vals[2][0]
+        elsif cols[i] == 'N92'
+          connection.execute(sql_insert, 12345.12)
+          connection.execute(sql_insert, "12345.12")
+          vals = connection.query(sql_select)
+          # puts vals.inspect
+          assert_equal 12345.12, vals[0][0], "NUMERIC (decimal)"
+          assert_equal 12345.12, vals[1][0], "NUMERIC (string)"
+        elsif cols[i] == 'D92'
+          connection.execute(sql_insert, 12345.12)
+          connection.execute(sql_insert, "12345.12")
+          vals = connection.query(sql_select)
+          # puts vals.inspect
+          assert_equal 12345.12, vals[0][0], "DECIMAL (decimal)"
+          assert_equal 12345.12, vals[1][0], "DECIMAL (string)"
         end
       end
       connection.drop
