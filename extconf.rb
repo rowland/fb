@@ -12,12 +12,12 @@
 # = Linux (Other)
 # * Volunteers?
 # = Mac OS X (PowerPC)
-# * Coming!
+# * Not currently tested.
 # = Mac OS X (Intel)
-# * Volunteers?
+# * Works
 require 'mkmf'
 
-libs = %w/ gdslib gds fbclient /  # InterBase library
+libs = %w/ fbclient gds /
 
 case RUBY_PLATFORM
   when /bccwin32/
@@ -37,7 +37,6 @@ dir_config("firebird")
 
 test_func = "isc_attach_database"
 
-# for ruby-1.8.1 mkmf
 case RUBY_PLATFORM
 when /mswin32/
   libs.find {|lib| have_library(lib) } and

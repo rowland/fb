@@ -19,7 +19,6 @@ spec = Gem::Specification.new do |s|
   # s.files << (PLATFORM =~ /darwin/) ? 'fb.bundle' : 'fb.so'
   s.platform = case PLATFORM
     when /win32/ then Gem::Platform::WIN32
-    when /linux/ then Gem::Platform::LINUX_586
   else
     Gem::Platform::RUBY
   end
