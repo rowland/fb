@@ -2861,7 +2861,7 @@ static VALUE database_s_create(int argc, VALUE *argv, VALUE klass)
  */
 static VALUE database_connect(VALUE self)
 {
-	long isc_status[20];
+	ISC_STATUS isc_status[20];
 	char *dbp;
 	int length;
 	isc_db_handle handle = NULL;
