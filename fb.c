@@ -158,11 +158,11 @@ static long calculate_buffsize(XSQLDA *sqlda)
 	return offset;
 }
 
-static VALUE fb_error_msg(long *isc_status)
+static VALUE fb_error_msg(const ISC_STATUS *isc_status)
 {
 	char msg[512];
 	VALUE result = rb_str_new(NULL, 0);
-	while (isc_interprete(msg, &isc_status))
+	while (fb_interpret(msg, 512, &isc_status))
 	{
 		result = rb_str_cat(result, msg, strlen(msg));
 		result = rb_str_cat(result, "\n", strlen("\n"));
