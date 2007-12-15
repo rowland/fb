@@ -162,7 +162,11 @@ static VALUE fb_error_msg(const ISC_STATUS *isc_status)
 {
 	char msg[512];
 	VALUE result = rb_str_new(NULL, 0);
+#if (FB_API_VER >= 20)
 	while (fb_interpret(msg, 512, &isc_status))
+#else
+	while (isc_interprete(msg, &isc_status))
+#endif
 	{
 		result = rb_str_cat(result, msg, strlen(msg));
 		result = rb_str_cat(result, "\n", strlen("\n"));
