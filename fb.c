@@ -94,10 +94,10 @@ struct FbConnection {
 	short downcase_names;
 	int dropped;
 	ISC_STATUS isc_status[20];
-	struct FbConnection *next;
+	/* struct FbConnection *next; */
 };
 
-static struct FbConnection *fb_connection_list;
+/* static struct FbConnection *fb_connection_list; */
 
 struct FbCursor {
 	int open;
@@ -126,7 +126,7 @@ typedef struct trans_opts
 
 /* global data */
 /* static isc_tr_handle global_transact = 0; */	/* transaction handle */
-static int connection_count = 0;
+/* static int connection_count = 0; */
 
 /* global utilities */
 
@@ -136,7 +136,7 @@ static int connection_count = 0;
 #define	UPPER(c)	(((c) >= 'a' && (c)<= 'z') ? (c) - 'a' + 'A' : (c))
 #define	FREE(p)		if (p)	{ xfree(p); p = 0; }
 #define	SETNULL(p)	if (p && strlen(p) == 0)	{ p = 0; }
-// #define HERE(s) printf("%s\n", s)
+/* #define HERE(s) printf("%s\n", s) */
 #define HERE(s)
 
 static long calculate_buffsize(XSQLDA *sqlda)
@@ -469,6 +469,7 @@ static void fb_connection_drop_cursors(struct FbConnection *fb_connection)
 	RARRAY(fb_connection->cursor)->len = 0;
 }
 
+/*
 static void fb_connection_remove(struct FbConnection *fb_connection)
 {
 	if (fb_connection_list != NULL) {
@@ -488,6 +489,7 @@ static void fb_connection_remove(struct FbConnection *fb_connection)
 		connection_count--;
 	}
 }
+*/
 
 static void fb_connection_disconnect(struct FbConnection *fb_connection)
 {
@@ -501,7 +503,7 @@ static void fb_connection_disconnect(struct FbConnection *fb_connection)
 		isc_detach_database(fb_connection->isc_status, &fb_connection->db);
 	}
 	fb_error_check(fb_connection->isc_status);
-	fb_connection_remove(fb_connection);
+	/* fb_connection_remove(fb_connection); */
 }
 
 static void fb_connection_disconnect_warn(struct FbConnection *fb_connection)
@@ -512,7 +514,7 @@ static void fb_connection_disconnect_warn(struct FbConnection *fb_connection)
 	}
 	isc_detach_database(fb_connection->isc_status, &fb_connection->db);
 	fb_error_check_warn(fb_connection->isc_status);
-	fb_connection_remove(fb_connection);
+	/* fb_connection_remove(fb_connection); */
 }
 
 static void fb_connection_mark(struct FbConnection *fb_connection)
@@ -2525,10 +2527,11 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	fb_connection->db = handle;
 	fb_connection->transact = 0;
 	fb_connection->cursor = rb_ary_new();
+/*
 	connection_count++;
 	fb_connection->next = fb_connection_list;
 	fb_connection_list = fb_connection;
-
+*/
 	dialect = SQL_DIALECT_CURRENT;
 	db_dialect = fb_connection_db_SQL_Dialect(fb_connection);
 
@@ -2950,7 +2953,7 @@ static VALUE database_drop(VALUE self)
 	Data_Get_Struct(connection, struct FbConnection, fb_connection);
 	isc_drop_database(fb_connection->isc_status, &fb_connection->db);
 	fb_error_check(fb_connection->isc_status);
-	fb_connection_remove(fb_connection);
+	/* fb_connection_remove(fb_connection); */
 	return Qnil;
 }
 
@@ -3013,10 +3016,10 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "role_names", connection_role_names, 0);
 	rb_define_method(rb_cFbConnection, "procedure_names", connection_procedure_names, 0);
 	rb_define_method(rb_cFbConnection, "indexes", connection_indexes, 0);
-	//rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0);
+	/* rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0); */
 
 	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
-	//rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1);
+	/* rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1); */
 	rb_define_method(rb_cFbCursor, "fields", cursor_fields, -1);
 	rb_define_method(rb_cFbCursor, "fetch", cursor_fetch, -1);
 	rb_define_method(rb_cFbCursor, "fetchall", cursor_fetchall, -1);
