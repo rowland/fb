@@ -491,31 +491,27 @@ static void fb_connection_remove(struct FbConnection *fb_connection)
 
 static void fb_connection_disconnect(struct FbConnection *fb_connection)
 {
-	ISC_STATUS isc_status[20];
-
 	if (fb_connection->transact) {
-		isc_commit_transaction(isc_status, &fb_connection->transact);
-		fb_error_check(isc_status);
+		isc_commit_transaction(fb_connection->isc_status, &fb_connection->transact);
+		fb_error_check(fb_connection->isc_status);
 	}
 	if (fb_connection->dropped) {
-		isc_drop_database(isc_status, &fb_connection->db);
+		isc_drop_database(fb_connection->isc_status, &fb_connection->db);
 	} else {
-		isc_detach_database(isc_status, &fb_connection->db);
+		isc_detach_database(fb_connection->isc_status, &fb_connection->db);
 	}
-	fb_error_check(isc_status);
+	fb_error_check(fb_connection->isc_status);
 	fb_connection_remove(fb_connection);
 }
 
 static void fb_connection_disconnect_warn(struct FbConnection *fb_connection)
 {
-	ISC_STATUS isc_status[20];
-
 	if (fb_connection->transact) {
-		isc_commit_transaction(isc_status, &fb_connection->transact);
-		fb_error_check_warn(isc_status);
+		isc_commit_transaction(fb_connection->isc_status, &fb_connection->transact);
+		fb_error_check_warn(fb_connection->isc_status);
 	}
-	isc_detach_database(isc_status, &fb_connection->db);
-	fb_error_check_warn(isc_status);
+	isc_detach_database(fb_connection->isc_status, &fb_connection->db);
+	fb_error_check_warn(fb_connection->isc_status);
 	fb_connection_remove(fb_connection);
 }
 
@@ -546,17 +542,16 @@ static struct FbConnection* fb_connection_check_retrieve(VALUE data)
 
 static unsigned short fb_connection_db_SQL_Dialect(struct FbConnection *fb_connection)
 {
-	ISC_STATUS isc_status[20];
 	long dialect;
 	long length;
 	char db_info_command = isc_info_db_SQL_dialect;
 	char isc_info_buff[16];
 
 	/* Get the db SQL Dialect */
-	isc_database_info(isc_status, &fb_connection->db,
+	isc_database_info(fb_connection->isc_status, &fb_connection->db,
 			1, &db_info_command,
 			sizeof(isc_info_buff), isc_info_buff);
-	fb_error_check(isc_status);
+	fb_error_check(fb_connection->isc_status);
 
 	if (isc_info_buff[0] == isc_info_db_SQL_dialect) {
 		length = isc_vax_integer(&isc_info_buff[1], 2);
@@ -1029,11 +1024,10 @@ static VALUE global_transaction_started()
 
 static void fb_connection_transaction_start(struct FbConnection *fb_connection, VALUE opt)
 {
-	HERE("fb_connection_transaction_start");
-	ISC_STATUS isc_status[20];
 	char *tpb = 0;
 	int tpb_len;
 
+	HERE("fb_connection_transaction_start");
 	if (fb_connection->transact) {
 		rb_raise(rb_eFbError, "A transaction has been already started");
 	}
@@ -1045,9 +1039,10 @@ static void fb_connection_transaction_start(struct FbConnection *fb_connection, 
 		tpb = NULL;
 	}
 
-	isc_start_transaction(isc_status, &fb_connection->transact, 1, &fb_connection->db, tpb_len, tpb);
+	isc_start_transaction(fb_connection->isc_status, &fb_connection->transact, 1, &fb_connection->db, tpb_len, tpb);
 	xfree(tpb);
-	fb_error_check(isc_status);
+	fb_error_check(fb_connection->isc_status);
+	HERE("fb_connection_transaction_start Z");
 }
 
 static void fb_connection_commit(struct FbConnection *fb_connection)
@@ -1183,12 +1178,11 @@ static VALUE connection_to_s(VALUE self)
  */
 static VALUE connection_cursor(VALUE self)
 {
-	HERE("connection_cursor");
-	ISC_STATUS isc_status[20];
 	VALUE c;
 	struct FbConnection *fb_connection;
 	struct FbCursor *fb_cursor;
 
+	HERE("connection_cursor");
 	Data_Get_Struct(self, struct FbConnection, fb_connection);
 	fb_connection_check(fb_connection);
 
@@ -1205,8 +1199,9 @@ static VALUE connection_cursor(VALUE self)
 	fb_cursor->i_buffer_size = 0;
 	fb_cursor->o_buffer = NULL;
 	fb_cursor->o_buffer_size = 0;
-	isc_dsql_alloc_statement2(isc_status, &fb_connection->db, &fb_cursor->stmt);
-	fb_error_check(isc_status);
+	isc_dsql_alloc_statement2(fb_connection->isc_status, &fb_connection->db, &fb_cursor->stmt);
+	fb_error_check(fb_connection->isc_status);
+	HERE("connection_cursor Z");
 
 	return c;
 }
@@ -1438,8 +1433,6 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 	/* struct time_object *tobj; */
 	struct tm tms;
 
-	ISC_STATUS isc_status[20];
-
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 
 	/* Check the number of parameters */
@@ -1569,23 +1562,23 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 					blob_handle = NULL;
 					isc_create_blob2(
-						isc_status,&fb_connection->db,&fb_connection->transact,
+						fb_connection->isc_status,&fb_connection->db,&fb_connection->transact,
 						&blob_handle,&blob_id,0,NULL);
-					fb_error_check(isc_status);
+					fb_error_check(fb_connection->isc_status);
 					length = RSTRING(obj)->len;
 					p = RSTRING(obj)->ptr;
 					while (length >= 4096) {
-						isc_put_segment(isc_status,&blob_handle,4096,p);
-						fb_error_check(isc_status);
+						isc_put_segment(fb_connection->isc_status,&blob_handle,4096,p);
+						fb_error_check(fb_connection->isc_status);
 						p += 4096;
 						length -= 4096;
 					}
 					if (length) {
-						isc_put_segment(isc_status,&blob_handle,length,p);
-						fb_error_check(isc_status);
+						isc_put_segment(fb_connection->isc_status,&blob_handle,length,p);
+						fb_error_check(fb_connection->isc_status);
 					}
-					isc_close_blob(isc_status,&blob_handle);
-					fb_error_check(isc_status);
+					isc_close_blob(fb_connection->isc_status,&blob_handle);
+					fb_error_check(fb_connection->isc_status);
 
 					*(ISC_QUAD *)var->sqldata = blob_id;
 					offset += alignment;
@@ -1734,12 +1727,12 @@ static VALUE precision_from_sqlvar(XSQLVAR *sqlvar)
 	return Qnil;
 }
 
-static int is_lowercase(VALUE value)
+static int no_lowercase(VALUE value)
 {
-	HERE("is_lowercase");
+	HERE("no_lowercase");
 	value = StringValue(value);
 	int result = rb_funcall(re_lowercase, id_matches, 1, value) == Qnil;
-	HERE("is_lowercase Z");
+	HERE("no_lowercase Z");
 	return result;
 }
 
@@ -1770,7 +1763,7 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_names)
 		} else {
 			name = rb_tainted_str_new(var->sqlname, var->sqlname_length);
 		}
-		if (downcase_names && is_lowercase(name)) {
+		if (downcase_names && no_lowercase(name)) {
 			rb_funcall(name, id_downcase_bang, 0);
 		}
 		rb_str_freeze(name);
@@ -1821,7 +1814,6 @@ static void fb_cursor_fetch_prep(struct FbCursor *fb_cursor)
 	long length;
 	long alignment;
 	long offset;
-	ISC_STATUS isc_status[20];
 
 	fb_cursor_check(fb_cursor);
 
@@ -1833,8 +1825,8 @@ static void fb_cursor_fetch_prep(struct FbCursor *fb_cursor)
 		rb_raise(rb_eFbError, "The cursor has not been opened. Use execute(query)");
 	}
 	/* Describe output SQLDA */
-	isc_dsql_describe(isc_status, &fb_cursor->stmt, 1, fb_cursor->o_sqlda);
-	fb_error_check(isc_status);
+	isc_dsql_describe(fb_connection->isc_status, &fb_cursor->stmt, 1, fb_cursor->o_sqlda);
+	fb_error_check(fb_connection->isc_status);
 
 	/* Set the output SQLDA */
 	cols = fb_cursor->o_sqlda->sqld;
@@ -1887,8 +1879,6 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	unsigned short max_segment = 0;
 	ISC_LONG num_segments = 0;
 	ISC_LONG total_length = 0;
-
-	ISC_STATUS isc_status[20];
 
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 	fb_connection_check(fb_connection);
@@ -1993,13 +1983,13 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 				case SQL_BLOB:
 					blob_handle = NULL;
 					blob_id = *(ISC_QUAD *)var->sqldata;
-					isc_open_blob2(isc_status, &fb_connection->db, &fb_connection->transact, &blob_handle, &blob_id, 0, NULL);
-					fb_error_check(isc_status);
+					isc_open_blob2(fb_connection->isc_status, &fb_connection->db, &fb_connection->transact, &blob_handle, &blob_id, 0, NULL);
+					fb_error_check(fb_connection->isc_status);
 					isc_blob_info(
-						isc_status, &blob_handle,
+						fb_connection->isc_status, &blob_handle,
 						sizeof(blob_items), blob_items,
 						sizeof(blob_info), blob_info);
-					fb_error_check(isc_status);
+					fb_error_check(fb_connection->isc_status);
 					for (p = blob_info; *p != isc_info_end; p += length) {
 						item = *p++;
 						length = (short) isc_vax_integer(p,2);
@@ -2018,11 +2008,11 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					}
 					val = rb_tainted_str_new(NULL,total_length);
 					for (p = RSTRING(val)->ptr; num_segments > 0; num_segments--, p += actual_seg_len) {
-						isc_get_segment(isc_status, &blob_handle, &actual_seg_len, max_segment, p);
-						fb_error_check(isc_status);
+						isc_get_segment(fb_connection->isc_status, &blob_handle, &actual_seg_len, max_segment, p);
+						fb_error_check(fb_connection->isc_status);
 					}
-					isc_close_blob(isc_status, &blob_handle);
-					fb_error_check(isc_status);
+					isc_close_blob(fb_connection->isc_status, &blob_handle);
+					fb_error_check(fb_connection->isc_status);
 					break;
 
 				case SQL_ARRAY:
@@ -2381,7 +2371,6 @@ static VALUE cursor_close(VALUE self)
 {
 	struct FbCursor *fb_cursor;
 	struct FbConnection *fb_connection;
-	ISC_STATUS isc_status[20];
 
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
@@ -2389,14 +2378,14 @@ static VALUE cursor_close(VALUE self)
 
 	/* Close the cursor */
 	if (fb_cursor->stmt) {
-		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_close);
-		fb_error_check_warn(isc_status);
-		isc_dsql_free_statement(isc_status, &fb_cursor->stmt, DSQL_drop);
-		fb_error_check(isc_status);
+		isc_dsql_free_statement(fb_connection->isc_status, &fb_cursor->stmt, DSQL_close);
+		fb_error_check_warn(fb_connection->isc_status);
+		isc_dsql_free_statement(fb_connection->isc_status, &fb_cursor->stmt, DSQL_drop);
+		fb_error_check(fb_connection->isc_status);
 		fb_cursor->open = Qfalse;
 		if (fb_connection->transact == fb_cursor->auto_transact) {
-			isc_commit_transaction(isc_status, &fb_connection->transact);
-			fb_error_check(isc_status);
+			isc_commit_transaction(fb_connection->isc_status, &fb_connection->transact);
+			fb_error_check(fb_connection->isc_status);
 			fb_cursor->auto_transact = fb_connection->transact;
 		}
 	}
@@ -2571,7 +2560,7 @@ static VALUE connection_names(VALUE self, char *sql)
 
 	while ((row = cursor_fetch(0, NULL, cursor)) != Qnil) {
 		VALUE name = rb_ary_entry(row, 0);
-		if (fb_connection->downcase_names && rb_funcall(re_lowercase, id_matches, 1, name) == Qnil) {
+		if (fb_connection->downcase_names && no_lowercase(name)) {
 			rb_funcall(name, id_downcase_bang, 0);
 		}
 		rb_funcall(name, id_rstrip_bang, 0);
@@ -2673,7 +2662,7 @@ static VALUE connection_index_columns(VALUE self, VALUE index_name)
 		VALUE row = rb_ary_entry(result, i);
 		VALUE name = rb_ary_entry(row, 1);
 		rb_funcall(name, id_rstrip_bang, 0);
-		if (fb_connection->downcase_names && rb_funcall(re_lowercase, id_matches, 1, name) == Qnil) {
+		if (fb_connection->downcase_names && no_lowercase(name)) {
 			rb_funcall(name, id_downcase_bang, 0);
 		}
 		rb_ary_push(columns, name);
@@ -2712,10 +2701,10 @@ static VALUE connection_indexes(VALUE self)
 		rb_funcall(index_name, id_rstrip_bang, 0);
 
 		if (fb_connection->downcase_names) {
-			if (rb_funcall(re_lowercase, id_matches, 1, table_name) == Qnil) {
+			if (no_lowercase(table_name)) {
 				rb_funcall(table_name, id_downcase_bang, 0);
 			}
-			if (rb_funcall(re_lowercase, id_matches, 1, index_name) == Qnil) {
+			if (no_lowercase(index_name)) {
 				rb_funcall(index_name, id_downcase_bang, 0);
 			}
 		}
@@ -2911,11 +2900,11 @@ static VALUE database_s_create(int argc, VALUE *argv, VALUE klass)
 static VALUE database_connect(VALUE self)
 {
 	ISC_STATUS isc_status[20];
-	/* ISC_STATUS isc_status[20]; */
 	char *dbp;
 	int length;
 	isc_db_handle handle = NULL;
 	VALUE database = rb_iv_get(self, "@database");
+
 	Check_Type(database, T_STRING);
 	dbp = connection_create_dbp(self, &length);
 	isc_attach_database(isc_status, 0, STR2CSTR(database), &handle, length, dbp);
