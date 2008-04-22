@@ -1,7 +1,7 @@
 require 'test/unit'
 require 'test/FbTestCases'
-require 'fb'
-include Fb
+# require 'fb'
+# include Fb
 
 class ConnectionTestCases < Test::Unit::TestCase
   include FbTestCases

@@ -1,7 +1,7 @@
 require 'test/unit'
 require 'test/FbTestCases'
-require 'fb'
-include Fb
+# require 'fb'
+# include Fb
 
 class CursorTestCases < Test::Unit::TestCase
   include FbTestCases
@@ -75,7 +75,7 @@ class CursorTestCases < Test::Unit::TestCase
   end
 
   def test_fields_array_downcased
-    Database.create(@parms.merge(:downcase_names => true)) do |connection|
+    Database.create(@parms.merge(:downcase_names => true)) do |connection| # xxx true
       connection.execute("select * from rdb$database") do |cursor|
         fields = cursor.fields
         fields_ary = cursor.fields :array
@@ -105,7 +105,7 @@ class CursorTestCases < Test::Unit::TestCase
   end
 
   def test_fields_hash_downcased
-    Database.create(@parms.merge(:downcase_names => true)) do |connection|
+    Database.create(@parms.merge(:downcase_names => true)) do |connection| # xxx true
       connection.execute("select * from rdb$database") do |cursor|
         fields = cursor.fields :hash
         assert_equal 4, fields.size

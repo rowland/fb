@@ -1,7 +1,10 @@
 require 'fileutils'
 include FileUtils
+require 'fb'
 
 module FbTestCases
+  include Fb
+
   def setup
     @db_file = case RUBY_PLATFORM
       when /win32/ then 'c:/var/fbdata/drivertest.fdb'
@@ -9,18 +12,18 @@ module FbTestCases
       else '/var/fbdata/drivertest.fdb'
     end
     @db_host = 'localhost'
+    @username = 'sysdba'
+    @password = 't1RnXMK'
     @parms = {
       :database => "#{@db_host}:#{@db_file}",
-      :username => 'sysdba',
-      :password => 'masterkey',
+      :username => @username,
+      :password => @password,
       :charset => 'NONE',
       :role => 'READER' }
-    @parms_s = "database = #{@db_host}:#{@db_file}; username = sysdba; password = masterkey; charset = NONE; role = READER;"
+    @parms_s = "database = #{@db_host}:#{@db_file}; username = #{@username}; password = #{@password}; charset = NONE; role = READER;"
     rm_rf @db_file
   end
 end
-
-require 'fb'
 
 class Fb::Connection
   def execute_script(sql_schema)

@@ -1,7 +1,7 @@
 require 'test/unit'
 require 'test/FbTestCases'
-require 'fb'
-include Fb
+# require 'fb'
+# include Fb
 
 class TransactionTestCases < Test::Unit::TestCase
   include FbTestCases
@@ -21,7 +21,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_transaction_block
     Database.create(@parms) do |connection|
       n = 0
@@ -40,7 +40,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_auto_transaction_select_with_exception
     sql_select = "SELECT * FROM RDB$DATABASE"
     Database.create(@parms) do |connection|
@@ -55,7 +55,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_auto_transaction_insert_with_exception
     sql_schema = "CREATE TABLE TEST (ID INT NOT NULL PRIMARY KEY, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
@@ -71,7 +71,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_auto_transaction_query
     Database.create(@parms) do |connection|
       assert !connection.transaction_started
@@ -80,7 +80,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_query_in_transaction
     Database.create(@parms) do |connection|
       assert !connection.transaction_started
@@ -93,7 +93,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_insert_commit
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
@@ -116,7 +116,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_insert_rollback
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
@@ -133,7 +133,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_transaction_block_insert_commit
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
@@ -157,7 +157,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_transaction_block_insert_rollback
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
@@ -178,7 +178,7 @@ class TransactionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
-  
+
   def test_simultaneous_transactions
     db_file1 = "#{@db_file}1"
     db_file2 = "#{@db_file}2"
@@ -206,7 +206,7 @@ class TransactionTestCases < Test::Unit::TestCase
       conn1.drop
     end
   end
-  
+
   def test_transaction_options_snapshot
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
@@ -231,7 +231,7 @@ class TransactionTestCases < Test::Unit::TestCase
       end
     end
   end
-  
+
   def test_transaction_options_read_committed
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"

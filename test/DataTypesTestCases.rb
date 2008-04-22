@@ -1,9 +1,9 @@
 require 'test/unit'
 require 'test/FbTestCases'
-require 'fb'
-require 'date'
+# require 'fb'
+# require 'date'
 
-include Fb
+# include Fb
 
 class DataTypesTestCases < Test::Unit::TestCase
   include FbTestCases

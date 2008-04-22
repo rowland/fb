@@ -1,7 +1,7 @@
 require 'test/unit'
 require 'test/FbTestCases'
-require 'fb'
-include Fb
+# require 'fb'
+# include Fb
 
 class DatabaseTestCases < Test::Unit::TestCase
   include FbTestCases
@@ -54,8 +54,8 @@ class DatabaseTestCases < Test::Unit::TestCase
   def test_initialize_hash
     db = Database.new(@parms)
     assert_equal @database, db.database
-    assert_equal 'sysdba', db.username
-    assert_equal 'masterkey', db.password
+    assert_equal @username, db.username
+    assert_equal @password, db.password
     assert_equal 'NONE', db.charset
     assert_equal 'READER', db.role
   end
@@ -63,8 +63,8 @@ class DatabaseTestCases < Test::Unit::TestCase
   def test_initialize_string
     db = Database.new(@parms_s)
     assert_equal @database, db.database
-    assert_equal 'sysdba', db.username
-    assert_equal 'masterkey', db.password
+    assert_equal @username, db.username
+    assert_equal @password, db.password
     assert_equal 'NONE', db.charset
     assert_equal 'READER', db.role
   end
