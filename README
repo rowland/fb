@@ -216,3 +216,17 @@ Change Log
 2007-12-11
 
 * Properly scaled NUMERIC and DECIMAL types when inserting with parameters.
+
+2007-12-13
+
+* Rounded instead of flooring NUMERIC and DECIMAL types.
+* Replace deprecated isc_interprete method call for FB2.
+
+2008-04-22
+
+* Implement explicit end-of-data flag for cursors to avoid synchronization error in newer Firebird builds.
+* Allocated longer buffers to avoid memory access error reported by valgrind
+* Tightened up C syntax for stricter compilers.
+* Factored symbol and regex creation out to global scope for efficiency.
+* Removed global transaction functions that weren't exposed anyway.
+* Removed remaining global state. This should allow for better concurrency.
