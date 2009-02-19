@@ -13,7 +13,7 @@ module FbTestCases
     end
     @db_host = 'localhost'
     @username = 'sysdba'
-    @password = 't1RnXMK'
+    @password = 'masterkey'
     @parms = {
       :database => "#{@db_host}:#{@db_file}",
       :username => @username,

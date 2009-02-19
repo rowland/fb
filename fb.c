@@ -1960,8 +1960,9 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 				case SQL_TIMESTAMP:
 					isc_decode_timestamp((ISC_TIMESTAMP *)var->sqldata, &tms);
 					t = mktime(&tms);
-					if (t < 0) t = 0;
-					val = rb_time_new(t, 0);
+                    if (t < 0) t = 0;
+                    val = rb_time_new(t, 0);
+                    rb_funcall(val, rb_intern("localtime"), 0);
 					break;
 
 				case SQL_TYPE_TIME:
@@ -2387,8 +2388,8 @@ static VALUE cursor_close(VALUE self)
 		fb_cursor->open = Qfalse;
 		if (fb_connection->transact == fb_cursor->auto_transact) {
 			isc_commit_transaction(fb_connection->isc_status, &fb_connection->transact);
-			fb_error_check(fb_connection->isc_status);
 			fb_cursor->auto_transact = fb_connection->transact;
+			fb_error_check(fb_connection->isc_status);
 		}
 	}
 	fb_cursor->fields_ary = Qnil;
