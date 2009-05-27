@@ -1924,8 +1924,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 				case SQL_SHORT:
 					if (var->sqlscale < 0) {
 						ratio = 1;
-						for (scnt = 0; scnt > var->sqlscale; scnt--)
-							ratio *= 10;
+						for (scnt = 0; scnt > var->sqlscale; scnt--) ratio *= 10;
 						dval = (double)*(short*)var->sqldata/ratio;
 						val = rb_float_new(dval);
 					} else {
@@ -1936,8 +1935,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 				case SQL_LONG:
 					if (var->sqlscale < 0) {
 						ratio = 1;
-						for (scnt = 0; scnt > var->sqlscale; scnt--)
-						ratio *= 10;
+						for (scnt = 0; scnt > var->sqlscale; scnt--) ratio *= 10;
 						dval = (double)*(long*)var->sqldata/ratio;
 						val = rb_float_new(dval);
 					} else {
@@ -1954,7 +1952,14 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					break;
 #if HAVE_LONG_LONG
 				case SQL_INT64:
-					val = LL2NUM(*(LONG_LONG*)var->sqldata);
+        				if (var->sqlscale < 0) {
+        					ratio = 1;
+        					for (scnt = 0; scnt > var->sqlscale; scnt--) ratio *= 10;
+        					dval = (double)*(long*)var->sqldata/ratio;
+        					val = rb_float_new(dval);
+        				} else {
+        					val = LL2NUM(*(LONG_LONG*)var->sqldata);
+        				}
 					break;
 #endif
 				case SQL_TIMESTAMP:

@@ -68,6 +68,34 @@ class DataTypesTestCases < Test::Unit::TestCase
     i * 100
   end
 
+  def sum_i(range)
+    range.inject(0) { |m, i| m + gen_i(i) }
+  end
+  
+  def sum_si(range)
+    range.inject(0) { |m, i| m + gen_si(i) }
+  end
+
+  def sum_bi(range)
+    range.inject(0) { |m, i| m + gen_bi(i) }
+  end
+  
+  def sum_f(range)
+    range.inject(0) { |m, i| m + gen_f(i) }
+  end
+  
+  def sum_d(range)
+    range.inject(0) { |m, i| m + gen_d(i) }
+  end
+  
+  def sum_n92(range)
+    range.inject(0) { |m, i| m + gen_n92(i) }
+  end
+  
+  def sum_d92(range)
+    range.inject(0) { |m, i| m + gen_d92(i) }
+  end
+
   def test_insert_basic_types
     sql_schema = <<-END
       create table TEST (
@@ -94,6 +122,10 @@ class DataTypesTestCases < Test::Unit::TestCase
         (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       END
     sql_select = "select * from TEST order by I"
+    sql_sum = "select sum(I), sum(SI), sum(BI), sum(F), sum(D), sum(N92), sum(D92) from TEST"
+    sql_avg = "select avg(I), avg(SI), avg(BI), avg(F), avg(D), avg(N92), avg(D92) from TEST"
+    sql_max = "select max(I), max(SI), max(BI), max(F), max(D), max(N92), max(D92) from TEST"
+    sql_min = "select min(I), min(SI), min(BI), min(F), min(D), min(N92), min(D92) from TEST"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
       connection.transaction do
@@ -128,6 +160,42 @@ class DataTypesTestCases < Test::Unit::TestCase
           i += 1
         end
       end
+
+      sums = connection.query(sql_sum).first
+      assert_equal sum_i(0...10), sums[0], "INTEGER"
+      assert_equal sum_si(0...10), sums[1], "SMALLINT"
+      assert_equal sum_bi(0...10), sums[2], "BIGINT"
+      assert_equal sum_f(0...10), sums[3], "FLOAT"
+      assert_equal sum_d(0...10), sums[4], "DOUBLE PRECISION"
+      assert_equal sum_n92(0...10), sums[5], "NUMERIC" # 4500.00
+      assert_equal sum_d92(0...10), sums[6], "DECIMAL" # 4500.00
+
+      avgs = connection.query(sql_avg).first
+      assert_equal sum_i(0...10) / 10, avgs[0], "INTEGER"
+      assert_equal sum_si(0...10) / 10, avgs[1], "SMALLINT"
+      assert_equal sum_bi(0...10) / 10, avgs[2], "BIGINT"
+      assert_equal sum_f(0...10) / 10, avgs[3], "FLOAT"
+      assert_equal sum_d(0...10) / 10, avgs[4], "DOUBLE PRECISION"
+      assert_equal sum_n92(0...10) / 10, avgs[5], "NUMERIC" # 450.00
+      assert_equal sum_d92(0...10) / 10, avgs[6], "DECIMAL" # 450.00
+
+      maxs = connection.query(sql_max).first
+      assert_equal gen_i(9), maxs[0], "INTEGER"
+      assert_equal gen_si(9), maxs[1], "SMALLINT"
+      assert_equal gen_bi(9), maxs[2], "BIGINT"
+      assert_equal gen_f(9), maxs[3], "FLOAT"
+      assert_equal gen_d(9), maxs[4], "DOUBLE PRECISION"
+      assert_equal gen_n92(9), maxs[5], "NUMERIC"
+      assert_equal gen_d92(9), maxs[6], "DECIMAL"
+
+      mins = connection.query(sql_min).first
+      assert_equal gen_i(0), mins[0], "INTEGER"
+      assert_equal gen_si(0), mins[1], "SMALLINT"
+      assert_equal gen_bi(0), mins[2], "BIGINT"
+      assert_equal gen_f(0), mins[3], "FLOAT"
+      assert_equal gen_d(0), mins[4], "DOUBLE PRECISION"
+      assert_equal gen_n92(0), mins[5], "NUMERIC"
+      assert_equal gen_d92(0), mins[6], "DECIMAL"
       connection.drop
     end
   end
