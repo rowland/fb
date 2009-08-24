@@ -381,6 +381,44 @@ class ConnectionTestCases < Test::Unit::TestCase
       assert_equal 'plusone', names[0]
     end
   end
+  
+  def test_trigger_names
+    table_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20)); CREATE GENERATOR TEST_SEQ;"
+    trigger_schema = <<-END_SQL
+      CREATE TRIGGER TEST_INSERT FOR TEST ACTIVE BEFORE INSERT AS
+      BEGIN
+        IF (NEW.ID IS NULL) THEN
+          NEW.ID = CAST(GEN_ID(TEST_SEQ, 1) AS INT);
+      END
+    END_SQL
+    Database.create(@parms) do |connection|
+      table_schema.split(';').each do |sql|
+        connection.execute(sql)
+      end
+      connection.execute(trigger_schema)
+      names = connection.trigger_names
+      assert names.include?('TEST_INSERT')
+    end
+  end
+
+  def test_trigger_names_downcased
+    table_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20)); CREATE GENERATOR TEST_SEQ;"
+    trigger_schema = <<-END_SQL
+      CREATE TRIGGER TEST_INSERT FOR TEST ACTIVE BEFORE INSERT AS
+      BEGIN
+        IF (NEW.ID IS NULL) THEN
+          NEW.ID = CAST(GEN_ID(TEST_SEQ, 1) AS INT);
+      END
+    END_SQL
+    Database.create(@parms.merge(:downcase_names => true)) do |connection|
+      table_schema.split(';').each do |sql|
+        connection.execute(sql)
+      end
+      connection.execute(trigger_schema)
+      names = connection.trigger_names
+      assert names.include?('test_insert')
+    end
+  end
 
   def test_index_names
     sql_schema = <<-END
