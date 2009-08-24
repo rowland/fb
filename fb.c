@@ -53,13 +53,14 @@ static VALUE rb_cFbSqlType;
 static VALUE rb_eFbError;
 static VALUE rb_sFbField;
 static VALUE rb_sFbIndex;
-
+static VALUE rb_sFbColumn;
 static VALUE rb_cDate;
 
 static ID id_matches;
 static ID id_downcase_bang;
 static VALUE re_lowercase;
 static ID id_rstrip_bang;
+static ID id_sub_bang;
 
 /* static char isc_info_stmt[] = { isc_info_sql_stmt_type }; */
 /* static char isc_info_buff[16]; */
@@ -136,7 +137,7 @@ typedef struct trans_opts
 #define	UPPER(c)	(((c) >= 'a' && (c)<= 'z') ? (c) - 'a' + 'A' : (c))
 #define	FREE(p)		if (p)	{ xfree(p); p = 0; }
 #define	SETNULL(p)	if (p && strlen(p) == 0)	{ p = 0; }
-/* #define HERE(s) printf("%s\n", s) */
+ // #define HERE(s) printf("%s\n", s) 
 #define HERE(s)
 
 static long calculate_buffsize(XSQLDA *sqlda)
@@ -369,6 +370,16 @@ static VALUE fb_sql_type_from_code(int code, int subtype)
 			break;
 	}
 	return rb_str_new2(sql_type);
+}
+
+/* call-seq:
+ *   from_code(code, subtype) -> String
+ *
+ * Returns the SQL type, such as VARCHAR or INTEGER for a given type code and subtype.
+ */
+static VALUE sql_type_from_code(VALUE self, VALUE code, VALUE subtype)
+{
+	return fb_sql_type_from_code(NUM2INT(code), NUM2INT(subtype));
 }
 
 static void fb_error_check(long *isc_status)
@@ -2654,6 +2665,67 @@ static VALUE connection_trigger_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+/* call-seq:
+ *   columns(table_name) -> array
+ *
+ * Returns array of objects describing each column of table_name.
+ */
+
+static VALUE connection_columns(VALUE self, VALUE table_name)
+{
+    int i;
+	struct FbConnection *fb_connection;
+    VALUE re_default = rb_reg_new("^\\s*DEFAULT\\s+", strlen("^\\s*DEFAULT\\s+"), RE_OPTION_IGNORECASE);
+    VALUE re_rdb = rb_reg_new("^RDB\\$", strlen("^RDB\\$"), 0);
+    VALUE empty = rb_str_new(NULL, 0);
+    VALUE columns = rb_ary_new();
+    char *sql = "SELECT r.rdb$field_name NAME, r.rdb$field_source, f.rdb$field_type, f.rdb$field_sub_type, "
+                "f.rdb$field_length, f.rdb$field_precision, f.rdb$field_scale SCALE, "
+                "COALESCE(r.rdb$default_source, f.rdb$default_source), "
+                "COALESCE(r.rdb$null_flag, f.rdb$null_flag) "
+                "FROM rdb$relation_fields r "
+                "JOIN rdb$fields f ON r.rdb$field_source = f.rdb$field_name "
+                "WHERE UPPER(r.rdb$relation_name) = ? "
+                "ORDER BY r.rdb$field_position";
+    VALUE query = rb_str_new2(sql);
+    table_name = rb_funcall(table_name, rb_intern("upcase"), 0);
+    VALUE query_parms[] = { query, table_name };
+    VALUE rs = connection_query(2, query_parms, self);
+	Data_Get_Struct(self, struct FbConnection, fb_connection);
+    for (i = 0; i < RARRAY(rs)->len; i++) {
+        VALUE row = rb_ary_entry(rs, i);
+        VALUE name = rb_ary_entry(row, 0);
+        VALUE domain = rb_ary_entry(row, 1);
+        VALUE sql_type = rb_ary_entry(row, 2);
+        VALUE sql_subtype = rb_ary_entry(row, 3);
+        VALUE length = rb_ary_entry(row, 4);
+        VALUE precision = rb_ary_entry(row, 5);
+        VALUE scale = rb_ary_entry(row, 6);
+        VALUE dflt = rb_ary_entry(row, 7);
+        VALUE not_null = rb_ary_entry(row, 8);
+		rb_funcall(name, id_rstrip_bang, 0);
+		rb_funcall(domain, id_rstrip_bang, 0);
+		if (fb_connection->downcase_names && no_lowercase(name)) {
+			rb_funcall(name, id_downcase_bang, 0);
+		}
+		if (rb_funcall(re_rdb, rb_intern("match"), 1, domain) != Qnil) {
+            domain = Qnil;
+        }
+		if (sql_subtype == Qnil) {
+            sql_subtype = INT2NUM(0);
+		}
+        sql_type = sql_type_from_code(self, sql_type, sql_subtype);
+        if (dflt != Qnil) {
+            rb_funcall(dflt, id_sub_bang, 2, re_default, empty);
+        }
+        VALUE nullable = RTEST(not_null) ? Qfalse : Qtrue;
+		VALUE column = rb_struct_new(rb_sFbColumn, name, domain, sql_type, sql_subtype, length, precision, scale, dflt, nullable);
+        rb_ary_push(columns, column);
+    }
+    rb_ary_freeze(columns);
+    return columns;
+}
+
 char *p(char *prompt, VALUE s)
 {
 	char *sz;
@@ -2740,16 +2812,6 @@ static VALUE connection_indexes(VALUE self)
 		rb_hash_aset(indexes, index_name, index_struct);
 	}
 	return indexes;
-}
-
-/* call-seq:
- *   from_code(code, subtype) -> String
- *
- * Returns the SQL type, such as VARCHAR or INTEGER for a given type code and subtype.
- */
-static VALUE sql_type_from_code(VALUE self, VALUE code, VALUE subtype)
-{
-	return fb_sql_type_from_code(NUM2INT(code), NUM2INT(subtype));
 }
 
 /*
@@ -3035,6 +3097,7 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "procedure_names", connection_procedure_names, 0);
 	rb_define_method(rb_cFbConnection, "trigger_names", connection_trigger_names, 0);
 	rb_define_method(rb_cFbConnection, "indexes", connection_indexes, 0);
+	rb_define_method(rb_cFbConnection, "columns", connection_columns, 1);
 	/* rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0); */
 
 	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
@@ -3062,7 +3125,8 @@ void Init_fb()
 
 	rb_sFbField = rb_struct_define("FbField", "name", "sql_type", "sql_subtype", "display_size", "internal_size", "precision", "scale", "nullable", "type_code", NULL);
 	rb_sFbIndex = rb_struct_define("FbIndex", "table_name", "index_name", "unique", "descending", "columns", NULL);
-	
+	rb_sFbColumn = rb_struct_define("FbColumn", "name", "domain", "sql_type", "sql_subtype", "length", "precision", "scale", "default", "nullable", NULL);
+
 	rb_require("date");
 	rb_require("time"); /* Needed as of Ruby 1.8.5 */
 	rb_cDate = rb_const_get(rb_cObject, rb_intern("Date"));
@@ -3072,4 +3136,5 @@ void Init_fb()
 	re_lowercase = rb_reg_regcomp(rb_str_new2("[[:lower:]]"));
 	rb_global_variable(&re_lowercase);
 	id_rstrip_bang = rb_intern("rstrip!");
+    id_sub_bang = rb_intern("sub!");
 }
