@@ -2642,6 +2642,18 @@ static VALUE connection_procedure_names(VALUE self)
 	return connection_names(self, sql);
 }
 
+/* call-seq:
+ *   trigger_names() -> array
+ *
+ * Returns sorted array of trigger names in connected database.
+ */
+static VALUE connection_trigger_names(VALUE self)
+{
+	char *sql = "SELECT RDB$TRIGGER_NAME FROM RDB$TRIGGERS "
+				"ORDER BY RDB$TRIGGER_NAME";
+	return connection_names(self, sql);
+}
+
 char *p(char *prompt, VALUE s)
 {
 	char *sz;
@@ -3021,6 +3033,7 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "view_names", connection_view_names, 0);
 	rb_define_method(rb_cFbConnection, "role_names", connection_role_names, 0);
 	rb_define_method(rb_cFbConnection, "procedure_names", connection_procedure_names, 0);
+	rb_define_method(rb_cFbConnection, "trigger_names", connection_trigger_names, 0);
 	rb_define_method(rb_cFbConnection, "indexes", connection_indexes, 0);
 	/* rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0); */
 
