@@ -392,9 +392,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       END
     END_SQL
     Database.create(@parms) do |connection|
-      table_schema.split(';').each do |sql|
-        connection.execute(sql)
-      end
+      connection.execute_script(table_schema)
       connection.execute(trigger_schema)
       names = connection.trigger_names
       assert names.include?('TEST_INSERT')
@@ -411,9 +409,7 @@ class ConnectionTestCases < Test::Unit::TestCase
       END
     END_SQL
     Database.create(@parms.merge(:downcase_names => true)) do |connection|
-      table_schema.split(';').each do |sql|
-        connection.execute(sql)
-      end
+      connection.execute_script(table_schema)
       connection.execute(trigger_schema)
       names = connection.trigger_names
       assert names.include?('test_insert')
@@ -497,4 +493,51 @@ class ConnectionTestCases < Test::Unit::TestCase
       connection.drop
     end
   end
+
+  def test_columns
+    sql_schema = <<-END
+      create domain STRING10 as VARCHAR(10);
+      create table TEST (
+        I INTEGER,
+        SI SMALLINT,
+        BI BIGINT,
+        F FLOAT, 
+        D DOUBLE PRECISION,
+        C CHAR,
+        C10 CHAR(10),
+        VC VARCHAR(1),
+        VC10 STRING10,
+        VC10000 VARCHAR(10000),
+        DT DATE,
+        TM TIME,
+        TS TIMESTAMP,
+        N92 NUMERIC(9,2),
+        D92 DECIMAL(9,2));
+    END
+    expected = [
+      # name, domain, sql_type, sql_subtype, length, precision, scale, default, nullable
+      Struct::FbColumn.new("I",       nil,        "INTEGER",          0, 4,     0,   0,  nil, true),
+      Struct::FbColumn.new("SI",      nil,        "SMALLINT",         0, 2,     0,   0,  nil, true),
+      Struct::FbColumn.new("BI",      nil,        "BIGINT",           0, 8,     0,   0,  nil, true),
+      Struct::FbColumn.new("F",       nil,        "FLOAT",            0, 4,     nil, 0,  nil, true),
+      Struct::FbColumn.new("D",       nil,        "DOUBLE PRECISION", 0, 8,     nil, 0,  nil, true),
+      Struct::FbColumn.new("C",       nil,        "CHAR",             0, 1,     nil, 0,  nil, true),
+      Struct::FbColumn.new("C10",     nil,        "CHAR",             0, 10,    nil, 0,  nil, true),
+      Struct::FbColumn.new("VC",      nil,        "VARCHAR",          0, 1,     nil, 0,  nil, true),
+      Struct::FbColumn.new("VC10",    "STRING10", "VARCHAR",          0, 10,    nil, 0,  nil, true),
+      Struct::FbColumn.new("VC10000", nil,        "VARCHAR",          0, 10000, nil, 0,  nil, true),
+      Struct::FbColumn.new("DT",      nil,        "DATE",             0, 4,     nil, 0,  nil, true),
+      Struct::FbColumn.new("TM",      nil,        "TIME",             0, 4,     nil, 0,  nil, true),
+      Struct::FbColumn.new("TS",      nil,        "TIMESTAMP",        0, 8,     nil, 0,  nil, true),
+      Struct::FbColumn.new("N92",     nil,        "NUMERIC",          1, 4,     9,   -2, nil, true),
+      Struct::FbColumn.new("D92",     nil,        "DECIMAL",          2, 4,     9,   -2, nil, true),
+    ]
+    Database.create(@parms) do |connection|
+      connection.execute_script(sql_schema)
+      columns = connection.columns('TEST')
+      expected.each_with_index do |column, i|
+        assert_equal column, columns[i]
+      end
+    end
+  end    
 end
