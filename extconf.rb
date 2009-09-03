@@ -27,10 +27,10 @@ case RUBY_PLATFORM
     libs.push "fbclient_ms"
   when /darwin/
     hosttype = `uname -m`.chomp
-    #$CFLAGS += " -DOS_UNIX"
-    $CFLAGS.gsub!(/-arch (\w+)/) { |m| $1 == hosttype ? m : '' }
-    $LDFLAGS.gsub!(/-arch (\w+)/) { |m| $1 == hosttype ? m : '' }
-    CONFIG['LDSHARED'].gsub!(/-arch (\w+)/) { |m| $1 == hosttype ? m : '' }
+    $CFLAGS += " -DOS_UNIX"
+#    $CFLAGS.gsub!(/-arch (\w+)/) { |m| $1 == hosttype ? m : '' }
+#    $LDFLAGS.gsub!(/-arch (\w+)/) { |m| $1 == hosttype ? m : '' }
+#    CONFIG['LDSHARED'].gsub!(/-arch (\w+)/) { |m| $1 == hosttype ? m : '' }
     $CPPFLAGS += " -I/Library/Frameworks/Firebird.framework/Headers"
     $LDFLAGS += " -framework Firebird"
   when /linux/

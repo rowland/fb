@@ -1573,7 +1573,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					obj = rb_obj_as_string(obj);
 
-					blob_handle = NULL;
+					blob_handle = 0;
 					isc_create_blob2(
 						fb_connection->isc_status,&fb_connection->db,&fb_connection->transact,
 						&blob_handle,&blob_id,0,NULL);
@@ -2000,7 +2000,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					break;
 
 				case SQL_BLOB:
-					blob_handle = NULL;
+					blob_handle = 0;
 					blob_id = *(ISC_QUAD *)var->sqldata;
 					isc_open_blob2(fb_connection->isc_status, &fb_connection->db, &fb_connection->transact, &blob_handle, &blob_id, 0, NULL);
 					fb_error_check(fb_connection->isc_status);
@@ -2985,7 +2985,7 @@ static VALUE database_connect(VALUE self)
 	ISC_STATUS isc_status[20];
 	char *dbp;
 	int length;
-	isc_db_handle handle = NULL;
+	isc_db_handle handle = 0;
 	VALUE database = rb_iv_get(self, "@database");
 
 	Check_Type(database, T_STRING);
