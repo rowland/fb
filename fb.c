@@ -1504,7 +1504,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 							ratio *= 10;
 						obj = double_from_obj(obj);
 						dvalue = NUM2DBL(obj) * ratio;
-						lvalue = (long)(dvalue + 0.5);
+						lvalue = (ISC_LONG)(dvalue + 0.5);
 					} else {
 						obj = long_from_obj(obj);
 						lvalue = NUM2LONG(obj);
@@ -1525,12 +1525,15 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 							ratio *= 10;
 						obj = double_from_obj(obj);
 						dvalue = NUM2DBL(obj) * ratio;
-						lvalue = (long)(dvalue + 0.5);
+						lvalue = (ISC_LONG)(dvalue + 0.5);
 					} else {
 						obj = long_from_obj(obj);
 						lvalue = NUM2LONG(obj);
 					}
-					*(long *)var->sqldata = lvalue;
+					if (lvalue < -2147483647 || lvalue > 2147483647) {
+                        rb_raise(rb_eRangeError, "integer overflow");
+					}
+					*(ISC_LONG *)var->sqldata = lvalue;
 					offset += alignment;
 					break;
 
@@ -1947,10 +1950,10 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					if (var->sqlscale < 0) {
 						ratio = 1;
 						for (scnt = 0; scnt > var->sqlscale; scnt--) ratio *= 10;
-						dval = (double)*(long*)var->sqldata/ratio;
+						dval = (double)*(ISC_LONG*)var->sqldata/ratio;
 						val = rb_float_new(dval);
 					} else {
-						val = INT2NUM(*(long*)var->sqldata);
+						val = INT2NUM(*(ISC_LONG*)var->sqldata);
 					}
 					break;
 
