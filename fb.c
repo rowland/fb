@@ -208,11 +208,11 @@ struct time_object {
 #define GetTimeval(obj, tobj) \
     Data_Get_Struct(obj, struct time_object, tobj)
 
-static VALUE fb_mktime(struct tm *tm)
+static VALUE fb_mktime(struct tm *tm, char *which)
 {
 	return rb_funcall(
-		rb_cTime, rb_intern("utc"), 6,
-		INT2FIX(tm->tm_year), INT2FIX(tm->tm_mon), INT2FIX(tm->tm_mday),
+		rb_cTime, rb_intern(which), 6,
+		INT2FIX(tm->tm_year), INT2FIX(tm->tm_mon + 1), INT2FIX(tm->tm_mday),
 		INT2FIX(tm->tm_hour), INT2FIX(tm->tm_min), INT2FIX(tm->tm_sec));
 }
 
@@ -1978,23 +1978,15 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 #endif
 				case SQL_TIMESTAMP:
 					isc_decode_timestamp((ISC_TIMESTAMP *)var->sqldata, &tms);
-					t = mktime(&tms);
-                    if (t < 0) t = 0;
-                    val = rb_time_new(t, 0);
-                    rb_funcall(val, rb_intern("localtime"), 0);
+					val = fb_mktime(&tms, "local");
 					break;
 
 				case SQL_TYPE_TIME:
 					isc_decode_sql_time((ISC_TIME *)var->sqldata, &tms);
-					/*
-					t = mktime(&tms);
-					if (t < 0) t = t + (24 * 60 * 60);
-					val = rb_time_new(t, 0);
-					*/
 					tms.tm_year = 2000;
-					tms.tm_mon = 1;
+					tms.tm_mon = 0;
 					tms.tm_mday = 1;
-					val = fb_mktime(&tms);
+					val = fb_mktime(&tms, "utc");
 					break;
 
 				case SQL_TYPE_DATE:
