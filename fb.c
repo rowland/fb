@@ -199,10 +199,10 @@ static VALUE fb_error_msg(ISC_STATUS *isc_status)
 #endif
 
 struct time_object {
-    struct timeval tv;
-    struct tm tm;
-    int gmt;
-    int tm_got;
+	struct timeval tv;
+	struct tm tm;
+	int gmt;
+	int tm_got;
 };
 
 #define GetTimeval(obj, tobj) \
@@ -210,9 +210,33 @@ struct time_object {
 
 static VALUE fb_mktime(struct tm *tm, char *which)
 {
+#if defined(_WIN32)
+	if (tm->tm_year + 1900 < 1970)
+	{
+		tm->tm_year = 70;
+		tm->tm_mon = 0;
+		tm->tm_mday = 1;
+		tm->tm_hour = 0;
+		tm->tm_min = 0;
+		tm->tm_sec = 0;
+	}
+#endif
+#if defined(_LP64) || defined(__LP64__) || defined(__arch64__)
+// No need to floor time on 64-bit Unix.
+#else
+	if (tm->tm_year + 1900 < 1902)
+	{
+		tm->tm_year = 2;
+		tm->tm_mon = 0;
+		tm->tm_mday = 1;
+		tm->tm_hour = 0;
+		tm->tm_min = 0;
+		tm->tm_sec = 0;
+	}
+#endif
 	return rb_funcall(
 		rb_cTime, rb_intern(which), 6,
-		INT2FIX(tm->tm_year), INT2FIX(tm->tm_mon + 1), INT2FIX(tm->tm_mday),
+		INT2FIX(tm->tm_year + 1900), INT2FIX(tm->tm_mon + 1), INT2FIX(tm->tm_mday),
 		INT2FIX(tm->tm_hour), INT2FIX(tm->tm_min), INT2FIX(tm->tm_sec));
 }
 
@@ -1982,7 +2006,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 				case SQL_TYPE_TIME:
 					isc_decode_sql_time((ISC_TIME *)var->sqldata, &tms);
-					tms.tm_year = 2000;
+					tms.tm_year = 100;
 					tms.tm_mon = 0;
 					tms.tm_mday = 1;
 					val = fb_mktime(&tms, "utc");

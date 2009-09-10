@@ -153,7 +153,7 @@ class DataTypesTestCases < Test::Unit::TestCase
           assert_equal gen_vc10(i), row["VC10"], "VARCHAR(10)"
           assert_equal gen_vc10000(i), row["VC10000"], "VARCHAR(10000)"
           assert_equal gen_dt(i), row["DT"], "DATE"
-          #assert_equal gen_tm(i).strftime("%H%M%S"), row["TM"].utc.strftime("%H%M%S"), "TIME"
+          assert_equal gen_tm(i).strftime("%H%M%S"), row["TM"].utc.strftime("%H%M%S"), "TIME"
           assert_equal gen_ts(i), row["TS"], "TIMESTAMP"
           assert_equal gen_n92(i), row["N92"], "NUMERIC"
           assert_equal gen_d92(i), row["D92"], "DECIMAL"
