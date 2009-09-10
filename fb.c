@@ -382,7 +382,7 @@ static VALUE sql_type_from_code(VALUE self, VALUE code, VALUE subtype)
 	return fb_sql_type_from_code(NUM2INT(code), NUM2INT(subtype));
 }
 
-static void fb_error_check(long *isc_status)
+static void fb_error_check(ISC_STATUS *isc_status)
 {
 	HERE("fb_error_check");
 	if (isc_status[0] == 1 && isc_status[1]) {
@@ -404,7 +404,7 @@ static void fb_error_check(long *isc_status)
 	HERE("fb_error_check 2");
 }
 
-static void fb_error_check_warn(long *isc_status)
+static void fb_error_check_warn(ISC_STATUS *isc_status)
 {
 	short code = isc_sqlcode(isc_status);
 	if (code != 0) {
@@ -1883,7 +1883,6 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	isc_blob_handle blob_handle;
 	ISC_QUAD blob_id;
 	unsigned short actual_seg_len;
-	time_t t;
 	static char blob_items[] = {
 		isc_info_blob_max_segment,
 		isc_info_blob_num_segments,
