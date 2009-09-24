@@ -113,19 +113,20 @@ class DataTypesTestCases < Test::Unit::TestCase
         TM TIME,
         TS TIMESTAMP,
         N92 NUMERIC(9,2),
-        D92 DECIMAL(9,2));
+        D92 DECIMAL(9,2),
+        N154 NUMERIC(15,4));
       END
     sql_insert = <<-END
       insert into test 
-        (I, SI, BI, F, D, C, C10, VC, VC10, VC10000, DT, TM, TS, N92, D92) 
+        (I, SI, BI, F, D, C, C10, VC, VC10, VC10000, DT, TM, TS, N92, D92, N154) 
         values
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       END
     sql_select = "select * from TEST order by I"
-    sql_sum = "select sum(I), sum(SI), sum(BI), sum(F), sum(D), sum(N92), sum(D92) from TEST"
-    sql_avg = "select avg(I), avg(SI), avg(BI), avg(F), avg(D), avg(N92), avg(D92) from TEST"
-    sql_max = "select max(I), max(SI), max(BI), max(F), max(D), max(N92), max(D92) from TEST"
-    sql_min = "select min(I), min(SI), min(BI), min(F), min(D), min(N92), min(D92) from TEST"
+    sql_sum = "select sum(I), sum(SI), sum(BI), sum(F), sum(D), sum(N92), sum(D92), sum(N154) from TEST"
+    sql_avg = "select avg(I), avg(SI), avg(BI), avg(F), avg(D), avg(N92), avg(D92), avg(N154) from TEST"
+    sql_max = "select max(I), max(SI), max(BI), max(F), max(D), max(N92), max(D92), max(N154) from TEST"
+    sql_min = "select min(I), min(SI), min(BI), min(F), min(D), min(N92), min(D92), min(N154) from TEST"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
       connection.transaction do
@@ -136,7 +137,7 @@ class DataTypesTestCases < Test::Unit::TestCase
             gen_f(i), gen_d(i),
             gen_c(i), gen_c10(i), gen_vc(i), gen_vc10(i), gen_vc10000(i), 
             gen_dt(i), gen_tm(i), gen_ts(i),
-            gen_n92(i), gen_d92(i))
+            gen_n92(i), gen_d92(i), gen_n92(i))
         end
       end
       connection.execute(sql_select) do |cursor|
@@ -157,6 +158,7 @@ class DataTypesTestCases < Test::Unit::TestCase
           assert_equal gen_ts(i), row["TS"], "TIMESTAMP"
           assert_equal gen_n92(i), row["N92"], "NUMERIC"
           assert_equal gen_d92(i), row["D92"], "DECIMAL"
+          assert_equal gen_n92(i), row["N154"], "NUMERIC"
           i += 1
         end
       end
@@ -169,6 +171,7 @@ class DataTypesTestCases < Test::Unit::TestCase
       assert_equal sum_d(0...10), sums[4], "DOUBLE PRECISION"
       assert_equal sum_n92(0...10), sums[5], "NUMERIC" # 4500.00
       assert_equal sum_d92(0...10), sums[6], "DECIMAL" # 4500.00
+      assert_equal sum_n92(0...10), sums[7], "NUMERIC" # 4500.00
 
       avgs = connection.query(sql_avg).first
       assert_equal sum_i(0...10) / 10, avgs[0], "INTEGER"
@@ -178,6 +181,7 @@ class DataTypesTestCases < Test::Unit::TestCase
       assert_equal sum_d(0...10) / 10, avgs[4], "DOUBLE PRECISION"
       assert_equal sum_n92(0...10) / 10, avgs[5], "NUMERIC" # 450.00
       assert_equal sum_d92(0...10) / 10, avgs[6], "DECIMAL" # 450.00
+      assert_equal sum_n92(0...10) / 10, avgs[7], "NUMERIC" # 450.00
 
       maxs = connection.query(sql_max).first
       assert_equal gen_i(9), maxs[0], "INTEGER"
@@ -187,6 +191,7 @@ class DataTypesTestCases < Test::Unit::TestCase
       assert_equal gen_d(9), maxs[4], "DOUBLE PRECISION"
       assert_equal gen_n92(9), maxs[5], "NUMERIC"
       assert_equal gen_d92(9), maxs[6], "DECIMAL"
+      assert_equal gen_n92(9), maxs[7], "NUMERIC"
 
       mins = connection.query(sql_min).first
       assert_equal gen_i(0), mins[0], "INTEGER"
@@ -196,6 +201,7 @@ class DataTypesTestCases < Test::Unit::TestCase
       assert_equal gen_d(0), mins[4], "DOUBLE PRECISION"
       assert_equal gen_n92(0), mins[5], "NUMERIC"
       assert_equal gen_d92(0), mins[6], "DECIMAL"
+      assert_equal gen_n92(0), mins[7], "NUMERIC"
       connection.drop
     end
   end
@@ -380,8 +386,8 @@ class DataTypesTestCases < Test::Unit::TestCase
   end
 
   def test_insert_correct_types
-    cols = %w{ I SI BI F D C C10 VC VC10 VC10000 DT TM TS N92 D92 }
-    types = %w{ INTEGER SMALLINT BIGINT FLOAT DOUBLE\ PRECISION CHAR CHAR(10) VARCHAR(1) VARCHAR(10) VARCHAR(10000) DATE TIME TIMESTAMP NUMERIC(9,2) DECIMAL(9,2) }
+    cols = %w{ I SI BI F D C C10 VC VC10 VC10000 DT TM TS N92 D92 N154 }
+    types = %w{ INTEGER SMALLINT BIGINT FLOAT DOUBLE\ PRECISION CHAR CHAR(10) VARCHAR(1) VARCHAR(10) VARCHAR(10000) DATE TIME TIMESTAMP NUMERIC(9,2) DECIMAL(9,2) NUMERIC(15,4) }
     sql_schema = "";
     assert_equal cols.size, types.size
     cols.size.times do |i|
@@ -488,6 +494,13 @@ class DataTypesTestCases < Test::Unit::TestCase
           # puts vals.inspect
           assert_equal 12345.12, vals[0][0], "DECIMAL (decimal)"
           assert_equal 12345.12, vals[1][0], "DECIMAL (string)"
+        elsif cols[i] == 'N154'
+          connection.execute(sql_insert, 12345.12)
+          connection.execute(sql_insert, "12345.12")
+          vals = connection.query(sql_select)
+          puts vals.inspect
+          assert_equal 12345.12, vals[0][0], "NUMERIC (decimal)"
+          assert_equal 12345.12, vals[1][0], "NUMERIC (string)"
         end
       end
       connection.drop
