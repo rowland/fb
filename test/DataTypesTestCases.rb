@@ -498,7 +498,7 @@ class DataTypesTestCases < Test::Unit::TestCase
           connection.execute(sql_insert, 12345.12)
           connection.execute(sql_insert, "12345.12")
           vals = connection.query(sql_select)
-          puts vals.inspect
+          # puts vals.inspect
           assert_equal 12345.12, vals[0][0], "NUMERIC (decimal)"
           assert_equal 12345.12, vals[1][0], "NUMERIC (string)"
         end

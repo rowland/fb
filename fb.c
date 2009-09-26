@@ -1453,6 +1453,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 	short dtp;
 	VALUE obj;
 	long lvalue;
+	ISC_INT64 llvalue;
 	long alignment;
 	double ratio;
 	double dvalue;
@@ -1590,8 +1591,20 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 				case SQL_INT64 :
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
-					obj = ll_from_obj(obj);
-					*(ISC_INT64 *)var->sqldata = NUM2LL(obj);
+
+					if (var->sqlscale < 0) {
+						ratio = 1;
+						for (scnt = 0; scnt > var->sqlscale; scnt--)
+							ratio *= 10;
+						obj = double_from_obj(obj);
+						dvalue = NUM2DBL(obj) * ratio;
+						llvalue = (ISC_INT64)(dvalue + 0.5);
+					} else {
+						obj = ll_from_obj(obj);
+						llvalue = NUM2LL(obj);
+					}
+
+					*(ISC_INT64 *)var->sqldata = llvalue;
 					offset += alignment;
 					break;
 #endif
