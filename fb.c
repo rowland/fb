@@ -2900,7 +2900,7 @@ static VALUE hash_from_connection_string(VALUE cs)
 
 static void check_page_size(int page_size)
 {
-	if (page_size != 1024 && page_size != 2048 && page_size != 4096 && page_size != 8192) {
+	if (page_size != 1024 && page_size != 2048 && page_size != 4096 && page_size != 8192 && page_size != 16384) {
 		rb_raise(rb_eFbError, "Invalid page size: %d", page_size);
 	}
 }
