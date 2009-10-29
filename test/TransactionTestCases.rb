@@ -256,4 +256,22 @@ class TransactionTestCases < Test::Unit::TestCase
       end
     end
   end
+
+  def test_auto_and_explicit_transactions
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
+    sql_update = "UPDATE TEST SET NAME = 'NAME 0' WHERE ID = 10"
+    Database.create(@parms) do |conn|
+      conn.execute(sql_schema)
+      conn.transaction { 10.times { |i| conn.execute(sql_insert, i, "NAME#{i}") } }
+      result = conn.query(sql_select)
+      assert !conn.transaction_started
+      conn.transaction("READ COMMITTED") do
+        assert conn.transaction_started
+        conn.execute(sql_update)
+      end
+      assert !conn.transaction_started
+    end
+  end
 end
