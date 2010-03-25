@@ -15,6 +15,13 @@
 # * Not currently tested.
 # = Mac OS X (Intel)
 # * Works
+
+if RUBY_PLATFORM =~ /(mingw32|mswin32)/ and ARGV.grep(/^--with-opt-dir=/).empty?
+  if opt = Dir["C:/Progra~1/Firebird/Firebird_*"].sort.last
+    ARGV << "--with-opt-dir=#{opt}"
+  end
+end
+
 require 'mkmf'
 
 libs = %w/ fbclient gds /
