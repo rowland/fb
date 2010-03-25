@@ -22,7 +22,7 @@ libs = %w/ fbclient gds /
 case RUBY_PLATFORM
   when /bccwin32/
     libs.push "fbclient_bor"
-  when /mswin32/
+  when /mswin32/, /mingw32/
     $CFLAGS  = $CFLAGS + " -DOS_WIN32"
     libs.push "fbclient_ms"
   when /darwin/
@@ -42,7 +42,7 @@ dir_config("firebird")
 test_func = "isc_attach_database"
 
 case RUBY_PLATFORM
-when /mswin32/
+when /mswin32/, /mingw32/
   libs.find {|lib| have_library(lib) } and
     have_func(test_func, ["ibase.h"])
 else
