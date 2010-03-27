@@ -15,7 +15,8 @@
 # * Works
 
 if RUBY_PLATFORM =~ /(mingw32|mswin32)/ and ARGV.grep(/^--with-opt-dir=/).empty?
-  if opt = Dir["C:/Progra~1/Firebird/Firebird_*"].sort.last
+  program_files = ENV['ProgramFiles'].gsub('\\', '/').gsub(/(\w+\s+[\w\s]+)/) { |s| s.size > 8 ? s[0,6] + '~1' : s }
+  if opt = Dir["#{program_files}/Firebird/Firebird_*"].sort.last
     ARGV << "--with-opt-dir=#{opt}"
   end
 end
