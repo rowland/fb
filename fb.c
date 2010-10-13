@@ -159,8 +159,8 @@ struct FbCursor {
 
 typedef struct trans_opts
 {
-	char *option1;
-	char *option2;
+	const char *option1;
+	const char *option2;
 	char  optval;
 	short position;
 	struct trans_opts *sub_opts;
@@ -249,7 +249,7 @@ struct time_object {
 #define GetTimeval(obj, tobj) \
     Data_Get_Struct(obj, struct time_object, tobj)
 
-static VALUE fb_mktime(struct tm *tm, char *which)
+static VALUE fb_mktime(struct tm *tm, const char *which)
 {
 #if defined(_WIN32)
 	if (tm->tm_year + 1900 < 1970)
@@ -356,7 +356,7 @@ static VALUE double_from_obj(VALUE obj)
 
 static VALUE fb_sql_type_from_code(int code, int subtype)
 {
-	char *sql_type = NULL;
+	const char *sql_type = NULL;
 	switch(code) {
 		case SQL_TEXT:
 		case blr_text:
@@ -525,7 +525,7 @@ static void global_close_cursors()
 static void fb_connection_close_cursors(struct FbConnection *fb_connection)
 {
 	int i;
-  int len = RARRAY_LEN(fb_connection->cursor);
+	long len = RARRAY_LEN(fb_connection->cursor);
 	for (i = 0; i < len; i++) {
 		cursor_close(RARRAY_PTR(fb_connection->cursor)[i]);
 	}
@@ -534,7 +534,7 @@ static void fb_connection_close_cursors(struct FbConnection *fb_connection)
 static void fb_connection_drop_cursors(struct FbConnection *fb_connection)
 {
 	int i;
-  int len = RARRAY_LEN(fb_connection->cursor);
+	long len = RARRAY_LEN(fb_connection->cursor);
 	for (i = 0; i < len; i++) {
 		cursor_drop(RARRAY_PTR(fb_connection->cursor)[i]);
 	}
@@ -704,7 +704,7 @@ static trans_opts	trans_opt_S[] =
 #define	RESV_WRITE	"WRITE"
 #define	RESV_CONTINUE	','
 
-static char* trans_parseopts(VALUE opt, int *tpb_len)
+static char* trans_parseopts(VALUE opt, long *tpb_len)
 {
 	char *s, *trans;
 	long used;
@@ -720,17 +720,17 @@ static char* trans_parseopts(VALUE opt, int *tpb_len)
 	char *resv_p;
 	char *resend_p;
 	char *tblend_p = 0;
-	int tbl_len;
-	int res_first;
+	long tbl_len;
+	long res_first;
 	int res_count;
-	int ofs;
+	long ofs;
 	char sp_prm;
 	char rw_prm;
 	int cont_f;
-	char *desc = 0;
+	const char *desc = 0;
 
 	/* Initialize */
-	s = STR2CSTR(opt);
+	s = StringValuePtr(opt);
 	trans = ALLOCA_N(char, strlen(s)+1);
 	strcpy(trans, s);
 	s = trans;
@@ -1099,7 +1099,7 @@ static VALUE global_transaction_started()
 static void fb_connection_transaction_start(struct FbConnection *fb_connection, VALUE opt)
 {
 	char *tpb = 0;
-	int tpb_len;
+	long tpb_len;
 
 	if (fb_connection->transact) {
 		rb_raise(rb_eFbError, "A transaction has been already started");
@@ -1467,7 +1467,7 @@ static void fb_cursor_free(struct FbCursor *fb_cursor)
 	xfree(fb_cursor);
 }
 
-static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALUE *argv)
+static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VALUE *argv)
 {
 	struct FbConnection *fb_connection;
 	long count;
@@ -1498,7 +1498,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 
 	/* Check the number of parameters */
 	if (fb_cursor->i_sqlda->sqld != argc) {
-		rb_raise(rb_eFbError, "statement requires %d items; %d given", fb_cursor->i_sqlda->sqld, argc);
+		rb_raise(rb_eFbError, "statement requires %d items; %ld given", fb_cursor->i_sqlda->sqld, argc);
 	}
 
 	/* Get the parameters */
@@ -1581,7 +1581,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					if (lvalue < -2147483647 || lvalue > 2147483647) {
                         rb_raise(rb_eRangeError, "integer overflow");
 					}
-					*(ISC_LONG *)var->sqldata = lvalue;
+					*(ISC_LONG *)var->sqldata = (ISC_LONG)lvalue;
 					offset += alignment;
 					break;
 
@@ -1598,7 +1598,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					if (dcheck != 0.0 && (dcheck < FLT_MIN || dcheck > FLT_MAX)) {
 						rb_raise(rb_eRangeError, "float overflow");
 					}
-					*(float *)var->sqldata = dvalue;
+					*(float *)var->sqldata = (float)dvalue;
 					offset += alignment;
 					break;
 
@@ -1720,7 +1720,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 	}
 }
 
-static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, VALUE *argv)
+static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, long argc, VALUE *argv)
 {
 	struct FbConnection *fb_connection;
 
@@ -2149,6 +2149,7 @@ static VALUE cursor_execute2(VALUE args)
 	struct FbCursor *fb_cursor;
 	struct FbConnection *fb_connection;
 	char *sql;
+	VALUE rb_sql;
 	long statement;
 	long length;
 	long in_params;
@@ -2162,7 +2163,8 @@ static VALUE cursor_execute2(VALUE args)
 	Data_Get_Struct(self, struct FbCursor, fb_cursor);
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
 
-	sql = STR2CSTR(rb_ary_shift(args));
+	rb_sql = rb_ary_shift(args);
+	sql = StringValuePtr(rb_sql);
 
 	/* Prepare query */
 	isc_dsql_prepare(fb_connection->isc_status, &fb_connection->transact, &fb_cursor->stmt, 0, sql, fb_connection_dialect(fb_connection), fb_cursor->o_sqlda);
@@ -2517,7 +2519,7 @@ static VALUE error_error_code(VALUE error)
 	return rb_iv_get(error, "error_code");
 }
 
-static char* dbp_create(int *length)
+static char* dbp_create(long *length)
 {
 	char *dbp = ALLOC_N(char, 1);
 	*dbp = isc_dpb_version1;
@@ -2525,11 +2527,11 @@ static char* dbp_create(int *length)
 	return dbp;
 }
 
-static char* dbp_add_string(char *dbp, char isc_dbp_code, char *s, int *length)
+static char* dbp_add_string(char *dbp, char isc_dbp_code, char *s, long *length)
 {
 	char *buf;
-	int old_length = *length;
-	int s_len = strlen(s);
+	long old_length = *length;
+	long s_len = strlen(s);
 	*length += 2 + s_len;
 	REALLOC_N(dbp, char, *length);
 	buf = dbp + old_length;
@@ -2539,7 +2541,7 @@ static char* dbp_add_string(char *dbp, char isc_dbp_code, char *s, int *length)
 	return dbp;
 }
 
-static char* connection_create_dbp(VALUE self, int *length)
+static char* connection_create_dbp(VALUE self, long *length)
 {
 	char *dbp;
 	VALUE username, password, charset, role;
@@ -2552,18 +2554,18 @@ static char* connection_create_dbp(VALUE self, int *length)
 	charset = rb_iv_get(self, "@charset");
 
 	dbp = dbp_create(length);
-	dbp = dbp_add_string(dbp, isc_dpb_user_name, STR2CSTR(username), length);
-	dbp = dbp_add_string(dbp, isc_dpb_password, STR2CSTR(password), length);
+	dbp = dbp_add_string(dbp, isc_dpb_user_name, StringValuePtr(username), length);
+	dbp = dbp_add_string(dbp, isc_dpb_password, StringValuePtr(password), length);
 	if (!NIL_P(charset)) {
-		dbp = dbp_add_string(dbp, isc_dpb_lc_ctype, STR2CSTR(charset), length);
+		dbp = dbp_add_string(dbp, isc_dpb_lc_ctype, StringValuePtr(charset), length);
 	}
 	if (!NIL_P(role)) {
-		dbp = dbp_add_string(dbp, isc_dpb_sql_role_name, STR2CSTR(role), length);
+		dbp = dbp_add_string(dbp, isc_dpb_sql_role_name, StringValuePtr(role), length);
 	}
 	return dbp;
 }
 
-static char* CONNECTION_PARMS[] = {
+static const char* CONNECTION_PARMS[] = {
 	"@database",
 	"@username",
 	"@password",
@@ -2578,7 +2580,7 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	unsigned short dialect;
 	unsigned short db_dialect;
 	VALUE downcase_names;
-	char *parm;
+	const char *parm;
 	int i;
 	struct FbConnection *fb_connection;
 	VALUE connection = Data_Make_Struct(rb_cFbConnection, struct FbConnection, fb_connection_mark, fb_connection_free, fb_connection);
@@ -2610,7 +2612,7 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	return connection;
 }
 
-static VALUE connection_names(VALUE self, char *sql)
+static VALUE connection_names(VALUE self, const char *sql)
 {
 	VALUE row;
 	VALUE query = rb_str_new2(sql);
@@ -2639,7 +2641,7 @@ static VALUE connection_names(VALUE self, char *sql)
  */
 static VALUE connection_table_names(VALUE self)
 {
-	char *sql = "SELECT RDB$RELATION_NAME FROM RDB$RELATIONS "
+	const char *sql = "SELECT RDB$RELATION_NAME FROM RDB$RELATIONS "
 				"WHERE (RDB$SYSTEM_FLAG <> 1 OR RDB$SYSTEM_FLAG IS NULL) AND RDB$VIEW_BLR IS NULL "
 				"ORDER BY RDB$RELATION_NAME";
 	return connection_names(self, sql);
@@ -2652,7 +2654,7 @@ static VALUE connection_table_names(VALUE self)
  */
 static VALUE connection_generator_names(VALUE self)
 {
-	char *sql = "SELECT RDB$GENERATOR_NAME FROM RDB$GENERATORS "
+	const char *sql = "SELECT RDB$GENERATOR_NAME FROM RDB$GENERATORS "
 				"WHERE (RDB$SYSTEM_FLAG IS NULL OR RDB$SYSTEM_FLAG <> 1) "
 				"ORDER BY RDB$GENERATOR_NAME";
 	return connection_names(self, sql);
@@ -2665,7 +2667,7 @@ static VALUE connection_generator_names(VALUE self)
  */
 static VALUE connection_view_names(VALUE self)
 {
-	char *sql = "SELECT RDB$RELATION_NAME, RDB$OWNER_NAME, RDB$VIEW_SOURCE FROM RDB$RELATIONS "
+	const char *sql = "SELECT RDB$RELATION_NAME, RDB$OWNER_NAME, RDB$VIEW_SOURCE FROM RDB$RELATIONS "
 				"WHERE (RDB$SYSTEM_FLAG <> 1 OR RDB$SYSTEM_FLAG IS NULL) AND NOT RDB$VIEW_BLR IS NULL AND RDB$FLAGS = 1 "
 				"ORDER BY RDB$RELATION_ID";
 	return connection_names(self, sql);
@@ -2678,7 +2680,7 @@ static VALUE connection_view_names(VALUE self)
  */
 static VALUE connection_role_names(VALUE self)
 {
-	char *sql = "SELECT * FROM RDB$ROLES WHERE RDB$SYSTEM_FLAG = 0 ORDER BY RDB$ROLE_NAME";
+	const char *sql = "SELECT * FROM RDB$ROLES WHERE RDB$SYSTEM_FLAG = 0 ORDER BY RDB$ROLE_NAME";
 	return connection_names(self, sql);
 }
 
@@ -2689,7 +2691,7 @@ static VALUE connection_role_names(VALUE self)
  */
 static VALUE connection_procedure_names(VALUE self)
 {
-	char *sql = "SELECT RDB$PROCEDURE_NAME FROM RDB$PROCEDURES "
+	const char *sql = "SELECT RDB$PROCEDURE_NAME FROM RDB$PROCEDURES "
 				"ORDER BY RDB$PROCEDURE_NAME";
 	return connection_names(self, sql);
 }
@@ -2701,7 +2703,7 @@ static VALUE connection_procedure_names(VALUE self)
  */
 static VALUE connection_trigger_names(VALUE self)
 {
-	char *sql = "SELECT RDB$TRIGGER_NAME FROM RDB$TRIGGERS "
+	const char *sql = "SELECT RDB$TRIGGER_NAME FROM RDB$TRIGGERS "
 				"ORDER BY RDB$TRIGGER_NAME";
 	return connection_names(self, sql);
 }
@@ -2720,7 +2722,7 @@ static VALUE connection_columns(VALUE self, VALUE table_name)
     VALUE re_rdb = rb_reg_new("^RDB\\$", strlen("^RDB\\$"), 0);
     VALUE empty = rb_str_new(NULL, 0);
     VALUE columns = rb_ary_new();
-    char *sql = "SELECT r.rdb$field_name NAME, r.rdb$field_source, f.rdb$field_type, f.rdb$field_sub_type, "
+    const char *sql = "SELECT r.rdb$field_name NAME, r.rdb$field_source, f.rdb$field_type, f.rdb$field_sub_type, "
                 "f.rdb$field_length, f.rdb$field_precision, f.rdb$field_scale SCALE, "
                 "COALESCE(r.rdb$default_source, f.rdb$default_source), "
                 "COALESCE(r.rdb$null_flag, f.rdb$null_flag) "
@@ -2782,7 +2784,7 @@ char *p(char *prompt, VALUE s)
 
 static VALUE connection_index_columns(VALUE self, VALUE index_name)
 {
-	char *sql_columns = "SELECT * "
+	const char *sql_columns = "SELECT * "
 						"FROM RDB$INDEX_SEGMENTS "
 						"WHERE RDB$INDEX_SEGMENTS.RDB$INDEX_NAME = ? "
 						"ORDER BY RDB$INDEX_SEGMENTS.RDB$FIELD_POSITION";
@@ -2813,7 +2815,7 @@ static VALUE connection_index_columns(VALUE self, VALUE index_name)
  */
 static VALUE connection_indexes(VALUE self)
 {
-	char *sql_indexes = "SELECT RDB$INDICES.RDB$RELATION_NAME, RDB$INDICES.RDB$INDEX_NAME, RDB$INDICES.RDB$UNIQUE_FLAG, RDB$INDICES.RDB$INDEX_TYPE "
+	const char *sql_indexes = "SELECT RDB$INDICES.RDB$RELATION_NAME, RDB$INDICES.RDB$INDEX_NAME, RDB$INDICES.RDB$UNIQUE_FLAG, RDB$INDICES.RDB$INDEX_TYPE "
 						"FROM RDB$INDICES "
 						"  JOIN RDB$RELATIONS ON RDB$INDICES.RDB$RELATION_NAME = RDB$RELATIONS.RDB$RELATION_NAME "
 						"WHERE (RDB$RELATIONS.RDB$SYSTEM_FLAG <> 1 OR RDB$RELATIONS.RDB$SYSTEM_FLAG IS NULL) ";
@@ -2869,14 +2871,14 @@ static void define_attrs(VALUE klass, char **attrs)
 }
 */
 
-static VALUE default_string(VALUE hash, char *key, char *def)
+static VALUE default_string(VALUE hash, const char *key, const char *def)
 {
 	VALUE sym = ID2SYM(rb_intern(key));
 	VALUE val = rb_hash_aref(hash, sym);
 	return NIL_P(val) ? rb_str_new2(def) : StringValue(val);
 }
 
-static VALUE default_int(VALUE hash, char *key, int def)
+static VALUE default_int(VALUE hash, const char *key, int def)
 {
 	VALUE sym = ID2SYM(rb_intern(key));
 	VALUE val = rb_hash_aref(hash, sym);
@@ -3027,13 +3029,13 @@ static VALUE database_connect(VALUE self)
 {
 	ISC_STATUS isc_status[20];
 	char *dbp;
-	int length;
+	long length;
 	isc_db_handle handle = 0;
 	VALUE database = rb_iv_get(self, "@database");
 
 	Check_Type(database, T_STRING);
 	dbp = connection_create_dbp(self, &length);
-	isc_attach_database(isc_status, 0, STR2CSTR(database), &handle, length, dbp);
+	isc_attach_database(isc_status, 0, StringValuePtr(database), &handle, length, dbp);
 	xfree(dbp);
 	fb_error_check(isc_status);
 	{
