@@ -144,9 +144,9 @@ class ConnectionTestCases < Test::Unit::TestCase
       affected = connection.execute(sql_update, 5)
       assert_equal 5, affected
       affected = connection.execute(sql_delete, 5)
-      assert 4, affected
+      assert_equal 4, affected
       rows = connection.execute(sql_select) do |cursor| cursor.fetchall end
-      assert 6, rows.size
+      assert_equal 6, rows.size
     end
   end
 
