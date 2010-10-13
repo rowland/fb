@@ -39,11 +39,10 @@
 #  define RARRAY_LEN(v) RARRAY(v)->len
 #endif
 
-#if HAVE_RUBY_REGEX_H
-#include "ruby/regex.h"
-#endif
-#if HAVE_REGEX_H
-#include "regex.h"
+#ifdef HAVE_RUBY_REGEX_H
+#  include "ruby/re.h"
+#else
+#  include "re.h"
 #endif
 
 // this sucks. but for some reason these moved around between 1.8 and 1.9
@@ -955,7 +954,7 @@ static char* trans_parseopts(VALUE opt, int *tpb_len)
 
 error:
 	xfree(tpb);
-	rb_raise(rb_eFbError, desc);
+	rb_raise(rb_eFbError, "%s", desc);
 }
 
 /*
@@ -1521,7 +1520,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					obj = rb_obj_as_string(obj);
 					if (RSTRING_LEN(obj) > var->sqllen) {
-						rb_raise(rb_eRangeError, "CHAR overflow: %d bytes exceeds %d byte(s) allowed.",
+						rb_raise(rb_eRangeError, "CHAR overflow: %ld bytes exceeds %d byte(s) allowed.",
 							RSTRING_LEN(obj), var->sqllen);
 					}
 					memcpy(var->sqldata, RSTRING_PTR(obj), RSTRING_LEN(obj));
@@ -1536,7 +1535,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					vary = (VARY *)var->sqldata;
 					obj = rb_obj_as_string(obj);
 					if (RSTRING_LEN(obj) > var->sqllen) {
-						rb_raise(rb_eRangeError, "VARCHAR overflow: %d bytes exceeds %d byte(s) allowed.",
+						rb_raise(rb_eRangeError, "VARCHAR overflow: %ld bytes exceeds %d byte(s) allowed.",
 							RSTRING_LEN(obj), var->sqllen);
 					}
 					memcpy(vary->vary_string, RSTRING_PTR(obj), RSTRING_LEN(obj));
@@ -2089,7 +2088,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					break;
 
 				default:
-					rb_raise(rb_eFbError, "Specified table includes unsupported datatype (%d)", dtp);
+					rb_raise(rb_eFbError, "Specified table includes unsupported datatype (%ld)", dtp);
 					break;
 			}
 		}
@@ -2216,7 +2215,7 @@ static VALUE cursor_execute2(VALUE args)
 		} else if (statement == isc_info_sql_stmt_rollback) {
 			rb_raise(rb_eFbError, "use Fb::Connection#rollback()");
 		} else if (in_params) {
-			fb_cursor_execute_withparams(fb_cursor, RARRAY_LEN(args), args);
+			fb_cursor_execute_withparams(fb_cursor, RARRAY_LEN(args), RARRAY_PTR(args));
 		} else {
 			isc_dsql_execute2(fb_connection->isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, NULL, NULL);
 			fb_error_check(fb_connection->isc_status);
