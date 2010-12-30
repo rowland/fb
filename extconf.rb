@@ -14,11 +14,27 @@
 # = Mac OS X (Intel)
 # * Works
 
-if RUBY_PLATFORM =~ /(mingw32|mswin32)/ and ARGV.grep(/^--with-opt-dir=/).empty?
-  program_files = ENV['ProgramFiles'].gsub('\\', '/').gsub(/(\w+\s+[\w\s]+)/) { |s| s.size > 8 ? s[0,6] + '~1' : s }
-  if opt = Dir["#{program_files}/Firebird/Firebird_*"].sort.last
-    ARGV << "--with-opt-dir=#{opt}"
+def unquote(string)
+  string.sub(/\A(['"])?(.*?)\1?\z/m, '\2') unless string.nil?
+end
+
+def read_firebird_registry
+  require 'win32/registry'
+  Win32::Registry::HKEY_LOCAL_MACHINE.open('SOFTWARE\Firebird Project\Firebird Server\Instances', Win32::Registry::Constants::KEY_READ) do |reg|
+    return reg.read_s('DefaultInstance') rescue nil
   end
+end
+
+def search_firebird_path
+  program_files = ENV['ProgramFiles'].gsub('\\', '/').gsub(/(\w+\s+[\w\s]+)/) { |s| s.size > 8 ? s[0,6] + '~1' : s }
+  Dir["#{program_files}/Firebird/Firebird_*"].sort.last
+end
+
+if RUBY_PLATFORM =~ /(mingw32|mswin32)/ and ARGV.grep(/^--with-opt-dir=/).empty?
+  opt = unquote(ENV['FIREBIRD'])    
+  opt = opt || read_firebird_registry
+  opt = opt || search_firebird_path
+  ARGV << "--with-opt-dir=#{opt}" if opt
 end
 
 require 'mkmf'
