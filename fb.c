@@ -21,13 +21,55 @@
   */
 
 #include "ruby.h"
-#include "re.h"
+
+/* Ensure compatibility with early releases of Ruby 1.8.5 */
+#ifndef RSTRING_PTR
+#  define RSTRING_PTR(v) RSTRING(v)->ptr
+#endif
+
+#ifndef RSTRING_LEN
+#  define RSTRING_LEN(v) RSTRING(v)->len
+#endif
+
+#ifndef RARRAY_PTR
+#  define RARRAY_PTR(v) RARRAY(v)->ptr
+#endif
+
+#ifndef RARRAY_LEN
+#  define RARRAY_LEN(v) RARRAY(v)->len
+#endif
+
+#if HAVE_RUBY_REGEX_H
+#include "ruby/regex.h"
+#endif
+#if HAVE_REGEX_H
+#include "regex.h"
+#endif
+
+// this sucks. but for some reason these moved around between 1.8 and 1.9
+#ifdef ONIGURUMA_H
+#define IGNORECASE ONIG_OPTION_IGNORECASE
+#define MULTILINE ONIG_OPTION_MULTILINE
+#define EXTENDED ONIG_OPTION_EXTEND
+#else
+#define IGNORECASE RE_OPTION_IGNORECASE
+#define MULTILINE RE_OPTION_MULTILINE
+#define EXTENDED RE_OPTION_EXTENDED
+#endif
+
+// this sucks too.
+#ifndef RREGEXP_SRC_PTR
+#define RREGEXP_SRC_PTR(r) RREGEXP(r)->str
+#define RREGEXP_SRC_LEN(r) RREGEXP(r)->len
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
 #include <ibase.h>
 #include <float.h>
 #include <time.h>
+
 
 #define	SQLDA_COLSINIT	50
 #define	SQLCODE_NOMORE	100
@@ -408,7 +450,6 @@ static VALUE sql_type_from_code(VALUE self, VALUE code, VALUE subtype)
 
 static void fb_error_check(ISC_STATUS *isc_status)
 {
-	HERE("fb_error_check");
 	if (isc_status[0] == 1 && isc_status[1]) {
 		char buf[1024];
 		VALUE exc, msg, msg1, msg2;
@@ -422,10 +463,8 @@ static void fb_error_check(ISC_STATUS *isc_status)
 
 		exc = rb_exc_new3(rb_eFbError, msg);
 		rb_iv_set(exc, "error_code", INT2FIX(code));
-		HERE("fb_error_check 1");
 		rb_exc_raise(exc);
 	}
-	HERE("fb_error_check 2");
 }
 
 static void fb_error_check_warn(ISC_STATUS *isc_status)
@@ -464,7 +503,6 @@ static void fb_cursor_free();
 /* connection utilities */
 static void fb_connection_check(struct FbConnection *fb_connection)
 {
-	HERE("fb_connection_check");
 	if (fb_connection->db == 0) {
 		rb_raise(rb_eFbError, "closed db connection");
 	}
@@ -488,20 +526,20 @@ static void global_close_cursors()
 static void fb_connection_close_cursors(struct FbConnection *fb_connection)
 {
 	int i;
-
-	for (i = 0; i < RARRAY(fb_connection->cursor)->len; i++) {
-		cursor_close(RARRAY(fb_connection->cursor)->ptr[i]);
+  int len = RARRAY_LEN(fb_connection->cursor);
+	for (i = 0; i < len; i++) {
+		cursor_close(RARRAY_PTR(fb_connection->cursor)[i]);
 	}
 }
 
 static void fb_connection_drop_cursors(struct FbConnection *fb_connection)
 {
 	int i;
-
-	for (i = 0; i < RARRAY(fb_connection->cursor)->len; i++) {
-		cursor_drop(RARRAY(fb_connection->cursor)->ptr[i]);
+  int len = RARRAY_LEN(fb_connection->cursor);
+	for (i = 0; i < len; i++) {
+		cursor_drop(RARRAY_PTR(fb_connection->cursor)[i]);
 	}
-	RARRAY(fb_connection->cursor)->len = 0;
+  rb_ary_clear(fb_connection->cursor);
 }
 
 /*
@@ -1064,7 +1102,6 @@ static void fb_connection_transaction_start(struct FbConnection *fb_connection, 
 	char *tpb = 0;
 	int tpb_len;
 
-	HERE("fb_connection_transaction_start");
 	if (fb_connection->transact) {
 		rb_raise(rb_eFbError, "A transaction has been already started");
 	}
@@ -1079,31 +1116,24 @@ static void fb_connection_transaction_start(struct FbConnection *fb_connection, 
 	isc_start_transaction(fb_connection->isc_status, &fb_connection->transact, 1, &fb_connection->db, tpb_len, tpb);
 	xfree(tpb);
 	fb_error_check(fb_connection->isc_status);
-	HERE("fb_connection_transaction_start Z");
 }
 
 static void fb_connection_commit(struct FbConnection *fb_connection)
 {
-	HERE("fb_connection_commit");
-
 	if (fb_connection->transact) {
 		fb_connection_close_cursors(fb_connection);
 		isc_commit_transaction(fb_connection->isc_status, &fb_connection->transact);
 		fb_error_check(fb_connection->isc_status);
 	}
-	HERE("fb_connection_commit Z");
 }
 
 static void fb_connection_rollback(struct FbConnection *fb_connection)
 {
-	HERE("fb_connection_rollback");
-
 	if (fb_connection->transact) {
 		fb_connection_close_cursors(fb_connection);
 		isc_rollback_transaction(fb_connection->isc_status, &fb_connection->transact);
 		fb_error_check(fb_connection->isc_status);
 	}
-	HERE("fb_connection_rollback Z");
 }
 
 /* call-seq:
@@ -1219,7 +1249,6 @@ static VALUE connection_cursor(VALUE self)
 	struct FbConnection *fb_connection;
 	struct FbCursor *fb_cursor;
 
-	HERE("connection_cursor");
 	Data_Get_Struct(self, struct FbConnection, fb_connection);
 	fb_connection_check(fb_connection);
 
@@ -1238,7 +1267,6 @@ static VALUE connection_cursor(VALUE self)
 	fb_cursor->o_buffer_size = 0;
 	isc_dsql_alloc_statement2(fb_connection->isc_status, &fb_connection->db, &fb_cursor->stmt);
 	fb_error_check(fb_connection->isc_status);
-	HERE("connection_cursor Z");
 
 	return c;
 }
@@ -1269,7 +1297,6 @@ static VALUE connection_cursor(VALUE self)
  */
 static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
 {
-	HERE("connection_execute");
 	VALUE cursor = connection_cursor(self);
 	VALUE val = cursor_execute(argc, argv, cursor);
 
@@ -1283,7 +1310,6 @@ static VALUE connection_execute(int argc, VALUE *argv, VALUE self)
 	} else {
 		cursor_drop(cursor);
 	}
-	HERE("connection_execute Z");
 	return val;
 }
 
@@ -1308,7 +1334,6 @@ static VALUE connection_query(int argc, VALUE *argv, VALUE self)
 	VALUE cursor;
 	VALUE result;
 
-	HERE("connection_query");
 	if (argc >= 1 && TYPE(argv[0]) == T_SYMBOL) {
 		format = argv[0];
 		argc--; argv++;
@@ -1321,7 +1346,6 @@ static VALUE connection_query(int argc, VALUE *argv, VALUE self)
 		result = cursor_fetchall(1, &format, cursor);
 		cursor_close(cursor);
 	}
-	HERE("connection_query Z");
 
 	return result;
 }
@@ -1496,12 +1520,12 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					obj = rb_obj_as_string(obj);
-					if (RSTRING(obj)->len > var->sqllen) {
+					if (RSTRING_LEN(obj) > var->sqllen) {
 						rb_raise(rb_eRangeError, "CHAR overflow: %d bytes exceeds %d byte(s) allowed.",
-							RSTRING(obj)->len, var->sqllen);
+							RSTRING_LEN(obj), var->sqllen);
 					}
-					memcpy(var->sqldata, RSTRING(obj)->ptr, RSTRING(obj)->len);
-					var->sqllen = RSTRING(obj)->len;
+					memcpy(var->sqldata, RSTRING_PTR(obj), RSTRING_LEN(obj));
+					var->sqllen = RSTRING_LEN(obj);
 					offset += var->sqllen + 1;
 					break;
 
@@ -1511,12 +1535,12 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					vary = (VARY *)var->sqldata;
 					obj = rb_obj_as_string(obj);
-					if (RSTRING(obj)->len > var->sqllen) {
+					if (RSTRING_LEN(obj) > var->sqllen) {
 						rb_raise(rb_eRangeError, "VARCHAR overflow: %d bytes exceeds %d byte(s) allowed.",
-							RSTRING(obj)->len, var->sqllen);
+							RSTRING_LEN(obj), var->sqllen);
 					}
-					memcpy(vary->vary_string, RSTRING(obj)->ptr, RSTRING(obj)->len);
-					vary->vary_length = RSTRING(obj)->len;
+					memcpy(vary->vary_string, RSTRING_PTR(obj), RSTRING_LEN(obj));
+					vary->vary_length = RSTRING_LEN(obj);
 					offset += vary->vary_length + sizeof(short);
 					break;
 
@@ -1618,8 +1642,8 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, int argc, VALU
 						fb_connection->isc_status,&fb_connection->db,&fb_connection->transact,
 						&blob_handle,&blob_id,0,NULL);
 					fb_error_check(fb_connection->isc_status);
-					length = RSTRING(obj)->len;
-					p = RSTRING(obj)->ptr;
+					length = RSTRING_LEN(obj);
+					p = RSTRING_PTR(obj);
 					while (length >= 4096) {
 						isc_put_segment(fb_connection->isc_status,&blob_handle,4096,p);
 						fb_error_check(fb_connection->isc_status);
@@ -1707,8 +1731,8 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 		int i;
 		VALUE obj;
 		VALUE ary = argv[0];
-		if (RARRAY(ary)->len > 0 && TYPE(RARRAY(ary)->ptr[0]) == T_ARRAY) {
-			for (i = 0; i < RARRAY(ary)->len; i++) {
+		if (RARRAY_LEN(ary) > 0 && TYPE(RARRAY_PTR(ary)[0]) == T_ARRAY) {
+			for (i = 0; i < RARRAY_LEN(ary); i++) {
 				obj = rb_ary_entry(ary, i);
 				fb_cursor_execute_withparams(fb_cursor, 1, &obj);
 			}
@@ -1718,7 +1742,7 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, int argc, V
 
 				/* Set the input parameters */
 				Check_Type(obj, T_ARRAY);
-				fb_cursor_set_inputparams(fb_cursor, RARRAY(obj)->len, RARRAY(obj)->ptr);
+				fb_cursor_set_inputparams(fb_cursor, RARRAY_LEN(obj), RARRAY_PTR(obj));
 
 				/* Execute SQL statement */
 				isc_dsql_execute2(fb_connection->isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, fb_cursor->i_sqlda, NULL);
@@ -1782,16 +1806,13 @@ static VALUE precision_from_sqlvar(XSQLVAR *sqlvar)
 
 static int no_lowercase(VALUE value)
 {
-	HERE("no_lowercase");
-	value = StringValue(value);
-	int result = rb_funcall(re_lowercase, id_matches, 1, value) == Qnil;
-	HERE("no_lowercase Z");
+	VALUE local_value = StringValue(value);
+	int result = rb_funcall(re_lowercase, id_matches, 1, local_value) == Qnil;
 	return result;
 }
 
 static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_names)
 {
-	HERE("fb_cursor_fields_ary");
 	long cols;
 	long count;
 	XSQLVAR *var;
@@ -1837,23 +1858,20 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_names)
 		rb_ary_push(ary, field);
 	}
 	rb_ary_freeze(ary);
-	HERE("fb_cursor_fields_ary Z");
 	return ary;
 }
 
 static VALUE fb_cursor_fields_hash(VALUE fields_ary)
 {
-	HERE("fb_cursor_fields_hash");
 	int i;
 	VALUE hash = rb_hash_new();
 
-	for (i = 0; i < RARRAY(fields_ary)->len; i++) {
+	for (i = 0; i < RARRAY_LEN(fields_ary); i++) {
 		VALUE field = rb_ary_entry(fields_ary, i);
 		VALUE name = rb_struct_aref(field, LONG2NUM(0));
 		rb_hash_aset(hash, name, field);
 	}
 
-	HERE("fb_cursor_fields_hash Z");
 	return hash;
 }
 
@@ -2057,7 +2075,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 						}
 					}
 					val = rb_tainted_str_new(NULL,total_length);
-					for (p = RSTRING(val)->ptr; num_segments > 0; num_segments--, p += actual_seg_len) {
+					for (p = RSTRING_PTR(val); num_segments > 0; num_segments--, p += actual_seg_len) {
 						isc_get_segment(fb_connection->isc_status, &blob_handle, &actual_seg_len, max_segment, p);
 						fb_error_check(fb_connection->isc_status);
 					}
@@ -2129,7 +2147,6 @@ static long cursor_rows_affected(struct FbCursor *fb_cursor, long statement_type
  */
 static VALUE cursor_execute2(VALUE args)
 {
-	HERE("cursor_execute2");
 	struct FbCursor *fb_cursor;
 	struct FbConnection *fb_connection;
 	char *sql;
@@ -2199,7 +2216,7 @@ static VALUE cursor_execute2(VALUE args)
 		} else if (statement == isc_info_sql_stmt_rollback) {
 			rb_raise(rb_eFbError, "use Fb::Connection#rollback()");
 		} else if (in_params) {
-			fb_cursor_execute_withparams(fb_cursor, RARRAY(args)->len, RARRAY(args)->ptr);
+			fb_cursor_execute_withparams(fb_cursor, RARRAY_LEN(args), args);
 		} else {
 			isc_dsql_execute2(fb_connection->isc_status, &fb_connection->transact, &fb_cursor->stmt, SQLDA_VERSION1, NULL, NULL);
 			fb_error_check(fb_connection->isc_status);
@@ -2219,7 +2236,7 @@ static VALUE cursor_execute2(VALUE args)
 		}
 
 		if (in_params) {
-			fb_cursor_set_inputparams(fb_cursor, RARRAY(args)->len, RARRAY(args)->ptr);
+			fb_cursor_set_inputparams(fb_cursor, RARRAY_LEN(args), RARRAY_PTR(args));
 		}
 
 		/* Open cursor */
@@ -2237,9 +2254,7 @@ static VALUE cursor_execute2(VALUE args)
 		/* Set the description attributes */
 		fb_cursor->fields_ary = fb_cursor_fields_ary(fb_cursor->o_sqlda, fb_connection->downcase_names);
 		fb_cursor->fields_hash = fb_cursor_fields_hash(fb_cursor->fields_ary);
-		HERE("cursor_execute2 Z");
 	}
-	HERE("cursor_execute2 Z");
 	return result;
 }
 
@@ -2250,7 +2265,6 @@ static VALUE cursor_execute2(VALUE args)
  */
 static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 {
-	HERE("cursor_execute");
 	struct FbCursor *fb_cursor;
 	struct FbConnection *fb_connection;
 	VALUE args;
@@ -2285,14 +2299,11 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 			return rb_funcall(rb_mKernel, rb_intern("raise"), 0);
 		} else if (result != Qnil) {
 			fb_connection_commit(fb_connection);
-			HERE("cursor_execute X");
 			return result;
 		} else {
-			HERE("cursor_execute Y");
 			return result;
 		}
 	} else {
-		HERE("cursor_execute Z");
 		return cursor_execute2(args);
 	}
 }
@@ -2301,7 +2312,7 @@ static VALUE fb_hash_from_ary(VALUE fields, VALUE row)
 {
 	VALUE hash = rb_hash_new();
 	int i;
-	for (i = 0; i < RARRAY(fields)->len; i++) {
+	for (i = 0; i < RARRAY_LEN(fields); i++) {
 		VALUE field = rb_ary_entry(fields, i);
 		VALUE name = rb_struct_aref(field, LONG2NUM(0));
 		VALUE v = rb_ary_entry(row, i);
@@ -2464,9 +2475,9 @@ static VALUE cursor_drop(VALUE self)
 
 	/* reset the reference from connection */
 	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
-	for (i = 0; i < RARRAY(fb_connection->cursor)->len; i++) {
-		if (RARRAY(fb_connection->cursor)->ptr[i] == self) {
-			RARRAY(fb_connection->cursor)->ptr[i] = Qnil;
+	for (i = 0; i < RARRAY_LEN(fb_connection->cursor); i++) {
+		if (RARRAY_PTR(fb_connection->cursor)[i] == self) {
+			RARRAY_PTR(fb_connection->cursor)[i] = Qnil;
 		}
 	}
 
@@ -2705,8 +2716,8 @@ static VALUE connection_trigger_names(VALUE self)
 static VALUE connection_columns(VALUE self, VALUE table_name)
 {
     int i;
-	struct FbConnection *fb_connection;
-    VALUE re_default = rb_reg_new("^\\s*DEFAULT\\s+", strlen("^\\s*DEFAULT\\s+"), RE_OPTION_IGNORECASE);
+    struct FbConnection *fb_connection;
+    VALUE re_default = rb_reg_new("^\\s*DEFAULT\\s+", strlen("^\\s*DEFAULT\\s+"), IGNORECASE);
     VALUE re_rdb = rb_reg_new("^RDB\\$", strlen("^RDB\\$"), 0);
     VALUE empty = rb_str_new(NULL, 0);
     VALUE columns = rb_ary_new();
@@ -2719,11 +2730,11 @@ static VALUE connection_columns(VALUE self, VALUE table_name)
                 "WHERE UPPER(r.rdb$relation_name) = ? "
                 "ORDER BY r.rdb$field_position";
     VALUE query = rb_str_new2(sql);
-    table_name = rb_funcall(table_name, rb_intern("upcase"), 0);
-    VALUE query_parms[] = { query, table_name };
+    VALUE upcase_table_name = rb_funcall(table_name, rb_intern("upcase"), 0);
+    VALUE query_parms[] = { query, upcase_table_name };
     VALUE rs = connection_query(2, query_parms, self);
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
-    for (i = 0; i < RARRAY(rs)->len; i++) {
+    Data_Get_Struct(self, struct FbConnection, fb_connection);
+    for (i = 0; i < RARRAY_LEN(rs); i++) {
         VALUE row = rb_ary_entry(rs, i);
         VALUE name = rb_ary_entry(row, 0);
         VALUE domain = rb_ary_entry(row, 1);
@@ -2734,23 +2745,25 @@ static VALUE connection_columns(VALUE self, VALUE table_name)
         VALUE scale = rb_ary_entry(row, 6);
         VALUE dflt = rb_ary_entry(row, 7);
         VALUE not_null = rb_ary_entry(row, 8);
-		rb_funcall(name, id_rstrip_bang, 0);
-		rb_funcall(domain, id_rstrip_bang, 0);
-		if (fb_connection->downcase_names && no_lowercase(name)) {
-			rb_funcall(name, id_downcase_bang, 0);
-		}
-		if (rb_funcall(re_rdb, rb_intern("match"), 1, domain) != Qnil) {
+        VALUE nullable;
+        VALUE column;
+        rb_funcall(name, id_rstrip_bang, 0);
+        rb_funcall(domain, id_rstrip_bang, 0);
+        if (fb_connection->downcase_names && no_lowercase(name)) {
+          rb_funcall(name, id_downcase_bang, 0);
+        }
+        if (rb_funcall(re_rdb, rb_intern("match"), 1, domain) != Qnil) {
             domain = Qnil;
         }
-		if (sql_subtype == Qnil) {
+        if (sql_subtype == Qnil) {
             sql_subtype = INT2NUM(0);
-		}
+        }
         sql_type = sql_type_from_code(self, sql_type, sql_subtype);
         if (dflt != Qnil) {
             rb_funcall(dflt, id_sub_bang, 2, re_default, empty);
         }
-        VALUE nullable = RTEST(not_null) ? Qfalse : Qtrue;
-		VALUE column = rb_struct_new(rb_sFbColumn, name, domain, sql_type, sql_subtype, length, precision, scale, dflt, nullable);
+        nullable = RTEST(not_null) ? Qfalse : Qtrue;
+        column = rb_struct_new(rb_sFbColumn, name, domain, sql_type, sql_subtype, length, precision, scale, dflt, nullable);
         rb_ary_push(columns, column);
     }
     rb_ary_freeze(columns);
@@ -2782,7 +2795,7 @@ static VALUE connection_index_columns(VALUE self, VALUE index_name)
 	struct FbConnection *fb_connection;
 	Data_Get_Struct(self, struct FbConnection, fb_connection);
 
-	for (i = 0; i < RARRAY(result)->len; i++) {
+	for (i = 0; i < RARRAY_LEN(result); i++) {
 		VALUE row = rb_ary_entry(result, i);
 		VALUE name = rb_ary_entry(row, 1);
 		rb_funcall(name, id_rstrip_bang, 0);
@@ -2812,7 +2825,7 @@ static VALUE connection_indexes(VALUE self)
 	struct FbConnection *fb_connection;
 	Data_Get_Struct(self, struct FbConnection, fb_connection);
 
-	for (i = 0; i < RARRAY(ary_indexes)->len; i++) {
+	for (i = 0; i < RARRAY_LEN(ary_indexes); i++) {
 		VALUE index_struct;
 		VALUE row = rb_ary_entry(ary_indexes, i);
 		VALUE table_name = rb_ary_entry(row, 0);
@@ -2886,10 +2899,10 @@ static VALUE hash_from_connection_string(VALUE cs)
 	ID id_split = rb_intern("split");
 	VALUE pairs = rb_funcall(cs, id_split, 1, re_SemiColon);
 	int i;
-	for (i = 0; i < RARRAY(pairs)->len; i++) {
+	for (i = 0; i < RARRAY_LEN(pairs); i++) {
 		VALUE pair = rb_ary_entry(pairs, i);
 		VALUE keyValue = rb_funcall(pair, id_split, 1, re_Equal);
-		if (RARRAY(keyValue)->len == 2) {
+		if (RARRAY_LEN(keyValue) == 2) {
 			VALUE key = rb_ary_entry(keyValue, 0);
 			VALUE val = rb_ary_entry(keyValue, 1);
 			rb_hash_aset(hash, rb_str_intern(key), val);
@@ -3082,7 +3095,6 @@ static VALUE database_s_drop(int argc, VALUE *argv, VALUE klass)
 
 void Init_fb()
 {
-	HERE("Init_fb");
 	rb_mFb = rb_define_module("Fb");
 
 	rb_cFbDatabase = rb_define_class_under(rb_mFb, "Database", rb_cData);
@@ -3144,11 +3156,11 @@ void Init_fb()
 	rb_define_singleton_method(rb_cFbSqlType, "from_code", sql_type_from_code, 2);
 
 /*
-//	rb_cFbGlobal = rb_define_class_under(rb_mFb, "Global", rb_cData);
-//	rb_define_singleton_method(rb_cFbGlobal, "transaction", global_transaction, -1);
-//	rb_define_singleton_method(rb_cFbGlobal, "transaction_started", global_transaction_started, 0);
-//	rb_define_singleton_method(rb_cFbGlobal, "commit", global_commit, 0);
-//	rb_define_singleton_method(rb_cFbGlobal, "rollback", global_rollback, 0);
+	rb_cFbGlobal = rb_define_class_under(rb_mFb, "Global", rb_cData);
+	rb_define_singleton_method(rb_cFbGlobal, "transaction", global_transaction, -1);
+	rb_define_singleton_method(rb_cFbGlobal, "transaction_started", global_transaction_started, 0);
+	rb_define_singleton_method(rb_cFbGlobal, "commit", global_commit, 0);
+	rb_define_singleton_method(rb_cFbGlobal, "rollback", global_rollback, 0);
 */
 
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
