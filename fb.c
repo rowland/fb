@@ -2668,7 +2668,7 @@ static VALUE connection_view_names(VALUE self)
  */
 static VALUE connection_role_names(VALUE self)
 {
-	char *sql = "SELECT * FROM RDB$ROLES ORDER BY RDB$ROLE_NAME";
+	char *sql = "SELECT * FROM RDB$ROLES WHERE RDB$SYSTEM_FLAG = 0 ORDER BY RDB$ROLE_NAME";
 	return connection_names(self, sql);
 }
 
