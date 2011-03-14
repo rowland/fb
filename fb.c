@@ -315,14 +315,38 @@ static void tm_from_timestamp(struct tm *tm, VALUE obj)
 {
 	struct time_object *tobj;
 
-	if (!rb_obj_is_kind_of(obj, rb_cTime) && rb_respond_to(obj, rb_intern("to_str")))
+	if (!rb_obj_is_kind_of(obj, rb_cTime))
 	{
-		VALUE s = rb_funcall(obj, rb_intern("to_str"), 0);
-		obj = rb_funcall(rb_cTime, rb_intern("parse"), 1, s);
+		if (rb_respond_to(obj, rb_intern("to_str")))
+		{
+			VALUE s = rb_funcall(obj, rb_intern("to_str"), 0);
+			obj = rb_funcall(rb_cTime, rb_intern("parse"), 1, s);
+		}
+		else
+		{
+			rb_raise(rb_eTypeError, "Expecting Time object or string.");
+		}
 	}
 
+#ifdef TypedData_Get_Struct
+	VALUE year, month, day, hour, min, sec;
+	year = rb_funcall(obj, rb_intern("year"), 0);
+	month = rb_funcall(obj, rb_intern("month"), 0);
+	day = rb_funcall(obj, rb_intern("day"), 0);
+	hour = rb_funcall(obj, rb_intern("hour"), 0);
+	min = rb_funcall(obj, rb_intern("min"), 0);
+	sec = rb_funcall(obj, rb_intern("sec"), 0);
+	memset(tm, 0, sizeof(struct tm));
+	tm->tm_year = FIX2INT(year) - 1900;
+	tm->tm_mon = FIX2INT(month) - 1;
+	tm->tm_mday = FIX2INT(day);
+	tm->tm_hour = FIX2INT(hour);
+	tm->tm_min = FIX2INT(min);
+	tm->tm_sec = FIX2INT(sec);
+#else
 	GetTimeval(obj, tobj);
 	*tm = tobj->tm;
+#endif
 }
 
 static VALUE long_from_obj(VALUE obj)
