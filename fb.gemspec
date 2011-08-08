@@ -17,7 +17,7 @@ spec = Gem::Specification.new do |s|
   s.extra_rdoc_files = ['README']
   s.rdoc_options << '--title' << 'Fb -- Ruby Firebird Extension' << '--main' << 'README' << '-x' << 'test'
   s.files = ['extconf.rb', 'fb.c', 'README', 'fb_extensions.rb'] + Dir.glob("test/*.rb")
-  s.platform = case PLATFORM
+  s.platform = case RUBY_PLATFORM
     when /win32/ then Gem::Platform::WIN32
   else
     Gem::Platform::RUBY
