@@ -3,8 +3,8 @@ require 'rubygems'
 
 spec = Gem::Specification.new do |s|
   s.name = "fb"
-  s.version = "0.6.7"
-  s.date = "2010-03-27"
+  s.version = "0.6.8"
+  s.date = "2011-08-08"
   s.summary = "Firebird and Interbase driver"
   s.requirements = "Firebird client library fbclient.dll, libfbclient.so or Firebird.framework."
   s.require_path = '.'
