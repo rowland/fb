@@ -313,6 +313,9 @@ static void tm_from_date(struct tm *tm, VALUE date)
 
 static void tm_from_timestamp(struct tm *tm, VALUE obj)
 {
+#ifdef TypedData_Get_Struct
+	VALUE year, month, day, hour, min, sec;
+#endif
 	struct time_object *tobj;
 
 	if (!rb_obj_is_kind_of(obj, rb_cTime))
@@ -329,7 +332,6 @@ static void tm_from_timestamp(struct tm *tm, VALUE obj)
 	}
 
 #ifdef TypedData_Get_Struct
-	VALUE year, month, day, hour, min, sec;
 	year = rb_funcall(obj, rb_intern("year"), 0);
 	month = rb_funcall(obj, rb_intern("month"), 0);
 	day = rb_funcall(obj, rb_intern("day"), 0);
