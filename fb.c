@@ -102,6 +102,7 @@ static ID id_downcase_bang;
 static VALUE re_lowercase;
 static ID id_rstrip_bang;
 static ID id_sub_bang;
+static ID id_force_encoding;
 
 /* static char isc_info_stmt[] = { isc_info_sql_stmt_type }; */
 /* static char isc_info_buff[16]; */
@@ -134,6 +135,7 @@ struct FbConnection {
 	unsigned short dialect;
 	unsigned short db_dialect;
 	short downcase_names;
+	VALUE encoding;
 	int dropped;
 	ISC_STATUS isc_status[20];
 	/* struct FbConnection *next; */
@@ -2007,11 +2009,17 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 			switch (dtp) {
 				case SQL_TEXT:
 					val = rb_tainted_str_new(var->sqldata, var->sqllen);
+					#if HAVE_RUBY_ENCODING_H
+					rb_funcall(val, id_force_encoding, 1, fb_connection->encoding);
+					#endif
 					break;
 
 				case SQL_VARYING:
 					vary = (VARY*)var->sqldata;
 					val = rb_tainted_str_new(vary->vary_string, vary->vary_length);
+					#if HAVE_RUBY_ENCODING_H
+					rb_funcall(val, id_force_encoding, 1, fb_connection->encoding);
+					#endif
 					break;
 
 				case SQL_SHORT:
@@ -2104,6 +2112,9 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 						isc_get_segment(fb_connection->isc_status, &blob_handle, &actual_seg_len, max_segment, p);
 						fb_error_check(fb_connection->isc_status);
 					}
+					#if HAVE_RUBY_ENCODING_H
+					rb_funcall(val, id_force_encoding, 1, fb_connection->encoding);
+					#endif
 					isc_close_blob(fb_connection->isc_status, &blob_handle);
 					fb_error_check(fb_connection->isc_status);
 					break;
@@ -2598,6 +2609,7 @@ static const char* CONNECTION_PARMS[] = {
 	"@charset",
 	"@role",
 	"@downcase_names",
+	"@encoding",
 	(char *)0
 };
 
@@ -2630,6 +2642,7 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	fb_connection->db_dialect = db_dialect;
 	downcase_names = rb_iv_get(db, "@downcase_names");
 	fb_connection->downcase_names = RTEST(downcase_names);
+	fb_connection->encoding = rb_iv_get(db, "@encoding");
 
 	for (i = 0; (parm = CONNECTION_PARMS[i]); i++) {
 		rb_iv_set(connection, parm, rb_iv_get(db, parm));
@@ -2976,6 +2989,7 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 		rb_iv_set(self, "@charset", default_string(parms, "charset", "NONE"));
 		rb_iv_set(self, "@role", rb_hash_aref(parms, ID2SYM(rb_intern("role"))));
 		rb_iv_set(self, "@downcase_names", rb_hash_aref(parms, ID2SYM(rb_intern("downcase_names"))));
+		rb_iv_set(self, "@encoding", default_string(parms, "encoding", "ASCII-8BIT"));
 		rb_iv_set(self, "@page_size", default_int(parms, "page_size", 1024));
 	}
 	return self;
@@ -3133,6 +3147,7 @@ void Init_fb()
 	rb_define_attr(rb_cFbDatabase, "charset", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "role", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "downcase_names", 1, 1);
+	rb_define_attr(rb_cFbDatabase, "encoding", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "page_size", 1, 1);
     rb_define_method(rb_cFbDatabase, "create", database_create, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "create", database_s_create, -1);
@@ -3148,6 +3163,7 @@ void Init_fb()
 	rb_define_attr(rb_cFbConnection, "charset", 1, 1);
 	rb_define_attr(rb_cFbConnection, "role", 1, 1);
 	rb_define_attr(rb_cFbConnection, "downcase_names", 1, 1);
+	rb_define_attr(rb_cFbConnection, "encoding", 1, 1);
 	rb_define_method(rb_cFbConnection, "to_s", connection_to_s, 0);
 	rb_define_method(rb_cFbConnection, "execute", connection_execute, -1);
 	rb_define_method(rb_cFbConnection, "query", connection_query, -1);
@@ -3207,4 +3223,5 @@ void Init_fb()
 	rb_global_variable(&re_lowercase);
 	id_rstrip_bang = rb_intern("rstrip!");
     id_sub_bang = rb_intern("sub!");
+    id_force_encoding = rb_intern("force_encoding");
 }
