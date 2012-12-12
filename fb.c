@@ -316,8 +316,9 @@ static void tm_from_timestamp(struct tm *tm, VALUE obj)
 {
 #ifdef TypedData_Get_Struct
 	VALUE year, month, day, hour, min, sec;
-#endif
+#else
 	struct time_object *tobj;
+#endif
 
 	if (!rb_obj_is_kind_of(obj, rb_cTime))
 	{
@@ -1499,7 +1500,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 	struct FbConnection *fb_connection;
 	long count;
 	long offset;
-	long type;
+	/* long type; */
 	short dtp;
 	VALUE obj;
 	long lvalue;
@@ -1532,7 +1533,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 	for (count = 0,offset = 0; count < argc; count++) {
 		obj = argv[count];
 
-		type = TYPE(obj);
+		/* type = TYPE(obj); */
 
 		/* Convert the data type for InterBase */
 		var = &fb_cursor->i_sqlda->sqlvar[count];
