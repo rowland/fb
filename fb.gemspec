@@ -13,7 +13,6 @@ def spec
     s.author = "Brent Rowland"
     s.email = "rowland@rowlandresearch.com"
     s.homepage = "http://github.com/rowland/fb"
-    s.rubyforge_project = "fblib"
     s.test_file = "test/FbTestSuite.rb"
     s.has_rdoc = true
     s.extra_rdoc_files = ['README']
