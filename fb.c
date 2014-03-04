@@ -2968,7 +2968,7 @@ static void check_page_size(int page_size)
  * :charset:: character set to be used with the connection (default: 'NONE')
  * :role:: database role to connect using (default: nil)
  * :downcase_names:: Column names are reported in lowercase, unless they were originally mixed case (default: nil).
- * :page_size:: page size to use when creating a database (default: 1024)
+ * :page_size:: page size to use when creating a database (default: 4096)
  */
 static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 {
@@ -2990,7 +2990,7 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 		rb_iv_set(self, "@role", rb_hash_aref(parms, ID2SYM(rb_intern("role"))));
 		rb_iv_set(self, "@downcase_names", rb_hash_aref(parms, ID2SYM(rb_intern("downcase_names"))));
 		rb_iv_set(self, "@encoding", default_string(parms, "encoding", "ASCII-8BIT"));
-		rb_iv_set(self, "@page_size", default_int(parms, "page_size", 1024));
+		rb_iv_set(self, "@page_size", default_int(parms, "page_size", 4096));
 	}
 	return self;
 }
