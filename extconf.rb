@@ -1,9 +1,9 @@
 #!/usr/bin/env ruby
 # = Windows
 # === Sample of Makefile creation:
-# <tt>ruby extconf.rb --with-opt-dir=C:/Progra~1/Firebird/Firebird_2_1</tt>
+# <tt>ruby extconf.rb --with-opt-dir=C:/Progra~1/Firebird/Firebird_2_5</tt>
 # === Notes
-# * Windows is known to build with Ruby 1.8.7 from rubyinstaller.org.
+# * Windows is known to build with Ruby from rubyinstaller.org.
 # * New in this release is automatically finding your Firebird install under Program Files.
 # * If your install is some place non-standard (or on a non-English version of Windows), you'll need to run extconf.rb manually as above.
 # * mkmf doesn't like directories with spaces, hence the 8.3 notation in the example above.
