@@ -646,7 +646,7 @@ static unsigned short fb_connection_db_SQL_Dialect(struct FbConnection *fb_conne
 {
 	long dialect;
 	long length;
-	char db_info_command = isc_info_db_SQL_dialect;
+	char db_info_command = isc_info_db_sql_dialect;
 	char isc_info_buff[16];
 
 	/* Get the db SQL Dialect */
@@ -655,7 +655,7 @@ static unsigned short fb_connection_db_SQL_Dialect(struct FbConnection *fb_conne
 			sizeof(isc_info_buff), isc_info_buff);
 	fb_error_check(fb_connection->isc_status);
 
-	if (isc_info_buff[0] == isc_info_db_SQL_dialect) {
+	if (isc_info_buff[0] == isc_info_db_sql_dialect) {
 		length = isc_vax_integer(&isc_info_buff[1], 2);
 		dialect = isc_vax_integer(&isc_info_buff[3], (short)length);
 	} else {
