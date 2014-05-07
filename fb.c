@@ -175,7 +175,6 @@ typedef struct trans_opts
 /* global utilities */
 
 #define	FB_ALIGN(n, b)	((n + b - 1) & ~(b - 1))
-/* #define FB_ALIGN(n,b)          ((n+1) & ~1) */
 #define	UPPER(c)	(((c) >= 'a' && (c)<= 'z') ? (c) - 'a' + 'A' : (c))
 #define	FREE(p)		if (p)	{ xfree(p); p = 0; }
 #define	SETNULL(p)	if (p && strlen(p) == 0)	{ p = 0; }
