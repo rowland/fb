@@ -1580,7 +1580,11 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 							ratio *= 10;
 						obj = double_from_obj(obj);
 						dvalue = NUM2DBL(obj) * ratio;
-						lvalue = (ISC_LONG)(dvalue + 0.5);
+						if (dvalue >= 0.0) {
+							lvalue = (ISC_LONG)(dvalue + 0.5);
+						} else {
+							lvalue = (ISC_LONG)(dvalue - 0.5);
+						}
 					} else {
 						obj = long_from_obj(obj);
 						lvalue = NUM2LONG(obj);
@@ -1601,7 +1605,11 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 							ratio *= 10;
 						obj = double_from_obj(obj);
 						dvalue = NUM2DBL(obj) * ratio;
-						lvalue = (ISC_LONG)(dvalue + 0.5);
+						if (dvalue >= 0.0) {
+							lvalue = (ISC_LONG)(dvalue + 0.5);
+						} else {
+							lvalue = (ISC_LONG)(dvalue - 0.5);
+						}
 					} else {
 						obj = long_from_obj(obj);
 						lvalue = NUM2LONG(obj);
@@ -1649,7 +1657,11 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 							ratio *= 10;
 						obj = double_from_obj(obj);
 						dvalue = NUM2DBL(obj) * ratio;
-						llvalue = (ISC_INT64)(dvalue + 0.5);
+						if (dvalue >= 0.0) {
+							llvalue = (ISC_INT64)(dvalue + 0.5);
+						} else {
+							llvalue = (ISC_INT64)(dvalue - 0.5);
+						}
 					} else {
 						obj = ll_from_obj(obj);
 						llvalue = NUM2LL(obj);

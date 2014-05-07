@@ -483,24 +483,30 @@ class DataTypesTestCases < Test::Unit::TestCase
         elsif cols[i] == 'N92'
           connection.execute(sql_insert, 12345.12)
           connection.execute(sql_insert, "12345.12")
+          connection.execute(sql_insert, -12345.12)
           vals = connection.query(sql_select)
           # puts vals.inspect
           assert_equal 12345.12, vals[0][0], "NUMERIC (decimal)"
           assert_equal 12345.12, vals[1][0], "NUMERIC (string)"
+          assert_equal -12345.12, vals[2][0], "NUMERIC (string)"
         elsif cols[i] == 'D92'
           connection.execute(sql_insert, 12345.12)
           connection.execute(sql_insert, "12345.12")
+          connection.execute(sql_insert, -12345.12)
           vals = connection.query(sql_select)
           # puts vals.inspect
           assert_equal 12345.12, vals[0][0], "DECIMAL (decimal)"
           assert_equal 12345.12, vals[1][0], "DECIMAL (string)"
+          assert_equal -12345.12, vals[2][0], "DECIMAL (string)"
         elsif cols[i] == 'N154'
           connection.execute(sql_insert, 12345.12)
           connection.execute(sql_insert, "12345.12")
+          connection.execute(sql_insert, -12345.12)
           vals = connection.query(sql_select)
           # puts vals.inspect
           assert_equal 12345.12, vals[0][0], "NUMERIC (decimal)"
           assert_equal 12345.12, vals[1][0], "NUMERIC (string)"
+          assert_equal -12345.12, vals[2][0], "NUMERIC (string)"
         end
       end
       connection.drop
