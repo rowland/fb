@@ -31,18 +31,8 @@
 // this sucks. but for some reason these moved around between 1.8 and 1.9
 #ifdef ONIGURUMA_H
 #define IGNORECASE ONIG_OPTION_IGNORECASE
-#define MULTILINE ONIG_OPTION_MULTILINE
-#define EXTENDED ONIG_OPTION_EXTEND
 #else
 #define IGNORECASE RE_OPTION_IGNORECASE
-#define MULTILINE RE_OPTION_MULTILINE
-#define EXTENDED RE_OPTION_EXTENDED
-#endif
-
-// this sucks too.
-#ifndef RREGEXP_SRC_PTR
-#define RREGEXP_SRC_PTR(r) RREGEXP(r)->str
-#define RREGEXP_SRC_LEN(r) RREGEXP(r)->len
 #endif
 
 #include <stdio.h>
