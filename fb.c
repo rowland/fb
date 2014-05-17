@@ -22,23 +22,6 @@
 
 #include "ruby.h"
 
-/* Ensure compatibility with early releases of Ruby 1.8.5 */
-#ifndef RSTRING_PTR
-#  define RSTRING_PTR(v) RSTRING(v)->ptr
-#endif
-
-#ifndef RSTRING_LEN
-#  define RSTRING_LEN(v) RSTRING(v)->len
-#endif
-
-#ifndef RARRAY_PTR
-#  define RARRAY_PTR(v) RARRAY(v)->ptr
-#endif
-
-#ifndef RARRAY_LEN
-#  define RARRAY_LEN(v) RARRAY(v)->len
-#endif
-
 #ifdef HAVE_RUBY_REGEX_H
 #  include "ruby/re.h"
 #else
@@ -48,18 +31,8 @@
 // this sucks. but for some reason these moved around between 1.8 and 1.9
 #ifdef ONIGURUMA_H
 #define IGNORECASE ONIG_OPTION_IGNORECASE
-#define MULTILINE ONIG_OPTION_MULTILINE
-#define EXTENDED ONIG_OPTION_EXTEND
 #else
 #define IGNORECASE RE_OPTION_IGNORECASE
-#define MULTILINE RE_OPTION_MULTILINE
-#define EXTENDED RE_OPTION_EXTENDED
-#endif
-
-// this sucks too.
-#ifndef RREGEXP_SRC_PTR
-#define RREGEXP_SRC_PTR(r) RREGEXP(r)->str
-#define RREGEXP_SRC_LEN(r) RREGEXP(r)->len
 #endif
 
 #include <stdio.h>
