@@ -2900,8 +2900,8 @@ static VALUE connection_indexes(VALUE self)
 		rb_str_freeze(table_name);
 		rb_str_freeze(index_name);
 
-		unique = RTEST(unique) ? Qtrue : Qfalse;
-		descending = RTEST(descending) ? Qtrue : Qfalse;
+		unique = (unique == INT2FIX(1)) ? Qtrue : Qfalse;
+		descending = (descending == INT2FIX(1)) ? Qtrue : Qfalse;
 
 		index_struct = rb_struct_new(rb_sFbIndex, table_name, index_name, unique, descending, columns);
 		rb_hash_aset(indexes, index_name, index_struct);
