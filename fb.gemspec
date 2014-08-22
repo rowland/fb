@@ -2,8 +2,8 @@ require 'rubygems'
 
 Gem::Specification.new do |s|
   s.name = "fb"
-  s.version = "0.7.2"
-  s.date = "2014-05-17"
+  s.version = "0.7.3"
+  s.date = "2014-08-22"
   s.summary = "Firebird database driver"
   s.description = "Ruby Firebird Extension Library"
   s.licenses = ["MIT"]
