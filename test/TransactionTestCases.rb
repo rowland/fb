@@ -1,9 +1,6 @@
-require 'test/unit'
 require 'test/FbTestCases'
-# require 'fb'
-# include Fb
 
-class TransactionTestCases < Test::Unit::TestCase
+class TransactionTestCases < FbTestCase
   include FbTestCases
   
   def test_transaction
@@ -30,7 +27,7 @@ class TransactionTestCases < Test::Unit::TestCase
         assert connection.transaction_started
       end
       assert !connection.transaction_started
-      assert_raise RuntimeError do
+      assert_raises RuntimeError do
         connection.transaction do
           assert connection.transaction_started
           raise "generic exception"
@@ -45,7 +42,7 @@ class TransactionTestCases < Test::Unit::TestCase
     sql_select = "SELECT * FROM RDB$DATABASE"
     Database.create(@parms) do |connection|
       assert !connection.transaction_started
-      assert_raise RuntimeError do
+      assert_raises RuntimeError do
         connection.execute(sql_select) do |cursor|
           assert connection.transaction_started
           raise "abort"
@@ -64,7 +61,7 @@ class TransactionTestCases < Test::Unit::TestCase
       assert !connection.transaction_started
       connection.execute(sql_insert, 1, "one")
       assert !connection.transaction_started
-      assert_raise Error do
+      assert_raises Error do
         connection.execute(sql_insert, 1, "two")
       end
       assert !connection.transaction_started, "transaction is active"
@@ -165,7 +162,7 @@ class TransactionTestCases < Test::Unit::TestCase
     Database.create(@parms) do |connection|
       connection.execute(sql_schema)
       assert !connection.transaction_started
-      assert_raise RuntimeError do
+      assert_raises RuntimeError do
         connection.transaction do
           10.times do |i|
             connection.execute(sql_insert, i, i.to_s);

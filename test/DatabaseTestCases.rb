@@ -1,9 +1,6 @@
-require 'test/unit'
 require 'test/FbTestCases'
-# require 'fb'
-# include Fb
 
-class DatabaseTestCases < Test::Unit::TestCase
+class DatabaseTestCases < FbTestCase
   include FbTestCases
   
   def setup
@@ -110,13 +107,13 @@ class DatabaseTestCases < Test::Unit::TestCase
   end
   
   def test_create_bad_param
-    assert_raise TypeError do
+    assert_raises TypeError do
       db = Database.create(1)
     end
   end
 
   def test_create_bad_page_size
-    assert_raise Error do
+    assert_raises Error do
       db = Database.create(@parms.merge(:page_size => 1000))
     end
   end
@@ -161,7 +158,7 @@ class DatabaseTestCases < Test::Unit::TestCase
       connection.execute("insert into test values (1, 'test role')")
     end
     Database.connect(@reader) do |connection|
-      assert_raise Error do
+      assert_raises Error do
         connection.execute("select * from test") do |cursor|
           flunk "Should not reach here."
         end

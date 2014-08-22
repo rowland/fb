@@ -1,8 +1,7 @@
 #coding:utf-8
-require 'test/unit'
 require 'test/FbTestCases'
 
-class EncodingTestCases < Test::Unit::TestCase
+class EncodingTestCases < FbTestCase
   include FbTestCases
 
   def test_encoding

@@ -1,9 +1,6 @@
-require 'test/unit'
 require 'test/FbTestCases'
-# require 'fb'
-# include Fb
 
-class ConnectionTestCases < Test::Unit::TestCase
+class ConnectionTestCases < FbTestCase
   include FbTestCases
   
   def test_execute

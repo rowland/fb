@@ -1,9 +1,6 @@
-require 'test/unit'
 require 'test/FbTestCases'
-# require 'fb'
-# include Fb
 
-class CursorTestCases < Test::Unit::TestCase
+class CursorTestCases < FbTestCase
   include FbTestCases
 
   def test_fetch_array
@@ -153,19 +150,19 @@ class CursorTestCases < Test::Unit::TestCase
       connection.execute("create generator test_seq");
       connection.execute("select gen_id(test_seq, 1) from rdb$database") do |cursor|
         r1 = cursor.fetch
-        assert_not_nil r1
+        assert !r1.nil?
         r2 = cursor.fetch
         assert_nil r2
-        assert_raise Error do
+        assert_raises Error do
           r3 = cursor.fetch
         end
       end
       connection.execute("select * from rdb$database") do |cursor|
         r1 = cursor.fetch
-        assert_not_nil r1
+        assert !r1.nil?
         r2 = cursor.fetch
         assert_nil r2
-        assert_raise Error do
+        assert_raises Error do
           r3 = cursor.fetch
         end
       end

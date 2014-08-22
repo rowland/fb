@@ -1,11 +1,6 @@
-require 'test/unit'
 require 'test/FbTestCases'
-# require 'fb'
-# require 'date'
 
-# include Fb
-
-class DataTypesTestCases < Test::Unit::TestCase
+class DataTypesTestCases < FbTestCase
   include FbTestCases
   
   def gen_i(i)
@@ -277,108 +272,108 @@ class DataTypesTestCases < Test::Unit::TestCase
       cols.size.times do |i|
         sql_insert = "INSERT INTO TEST_#{cols[i]} (VAL) VALUES (?);"
         if cols[i] == 'I'
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, {:five => "five"})
           end
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, Time.now)
           end
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, 5000000000)
           end
         elsif cols[i] == 'SI'
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, {:five => "five"})
           end
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, Time.now)
           end
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, 100000)
           end
         elsif cols[i] == 'BI'
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, {:five => "five"})
           end
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, Time.now)
           end
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, 184467440737095516160) # 2^64 * 10
           end
         elsif cols[i] == 'F'
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, {:five => "five"})
           end
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, 10 ** 39)
           end
         elsif cols[i] == 'D'
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, {:five => "five"})
           end
         elsif cols[i] == 'VC'
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, "too long")
           end
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, 1.0/3.0)
           end
         elsif cols[i] ==  'VC10'
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, 1.0/3.0)
           end
         elsif cols[i].include?('VC10000')
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, "X" * 10001)
           end
         elsif cols[i] == 'C'
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, "too long")
           end
         elsif cols[i] == 'C10'
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, Time.now)
           end
         elsif cols[i] == 'DT'
-          assert_raise ArgumentError do
+          assert_raises ArgumentError do
             connection.execute(sql_insert, Date)
           end
-          assert_raise ArgumentError do
+          assert_raises ArgumentError do
             connection.execute(sql_insert, 2006)
           end
         elsif cols[i] == 'TM'
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, {:date => "2006/1/1"})
           end
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, 10000)
           end
         elsif cols[i] ==  'TS'
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, 5.5)
           end
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, 10000)
           end
         elsif cols[i] ==  'N92'
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, {:five => "five"})
           end
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, Time.now)
           end
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, 5000000000)
           end
         elsif cols[i] ==  'D92' 
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, {:five => "five"})
           end
-          assert_raise TypeError do
+          assert_raises TypeError do
             connection.execute(sql_insert, Time.now)
           end
-          assert_raise RangeError do
+          assert_raises RangeError do
             connection.execute(sql_insert, 5000000000)
           end
         end

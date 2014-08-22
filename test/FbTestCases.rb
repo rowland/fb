@@ -2,6 +2,25 @@ require 'fileutils'
 include FileUtils
 require 'fb'
 
+if RUBY_VERSION =~ /^2/
+  require 'minitest/autorun'
+
+  unless Minitest.const_defined?('Test')
+    Minitest::Test = MiniTest::Unit::TestCase
+  end
+
+  class FbTestCase < Minitest::Test
+  end
+
+else
+  require 'test/unit'
+
+  class FbTestCase < Test::Unit::TestCase
+    def default_test
+    end
+  end
+end
+
 module FbTestCases
   include Fb
 
