@@ -1618,7 +1618,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					*(double *)var->sqldata = dvalue;
 					offset += alignment;
 					break;
-#if HAVE_LONG_LONG
+
 				case SQL_INT64 :
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
@@ -1642,7 +1642,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					*(ISC_INT64 *)var->sqldata = llvalue;
 					offset += alignment;
 					break;
-#endif
+
 				case SQL_BLOB :
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
@@ -2035,18 +2035,18 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 				case SQL_DOUBLE:
 					val = rb_float_new(*(double*)var->sqldata);
 					break;
-#if HAVE_LONG_LONG
+
 				case SQL_INT64:
         				if (var->sqlscale < 0) {
         					ratio = 1;
         					for (scnt = 0; scnt > var->sqlscale; scnt--) ratio *= 10;
-        					dval = (double)*(long*)var->sqldata/ratio;
+        					dval = (double)*(ISC_INT64*)var->sqldata/ratio;
         					val = rb_float_new(dval);
         				} else {
-        					val = LL2NUM(*(LONG_LONG*)var->sqldata);
+        					val = LL2NUM(*(ISC_INT64*)var->sqldata);
         				}
 					break;
-#endif
+
 				case SQL_TIMESTAMP:
 					isc_decode_timestamp((ISC_TIMESTAMP *)var->sqldata, &tms);
 					val = fb_mktime(&tms, "local");

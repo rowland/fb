@@ -65,7 +65,7 @@ class DataTypesTestCases < Test::Unit::TestCase
   end
 
   def gen_d92(i)
-    i * 100
+    i * 10000
   end
 
   def sum_i(range)
@@ -114,13 +114,14 @@ class DataTypesTestCases < Test::Unit::TestCase
         TS TIMESTAMP,
         N92 NUMERIC(9,2),
         D92 DECIMAL(9,2),
-        N154 NUMERIC(15,4));
+        N154 NUMERIC(15,4),
+	D185 DECIMAL(18,5));
       END
     sql_insert = <<-END
       insert into test 
-        (I, SI, BI, F, D, C, C10, VC, VC10, VC10000, DT, TM, TS, N92, D92, N154) 
+        (I, SI, BI, F, D, C, C10, VC, VC10, VC10000, DT, TM, TS, N92, D92, N154, D185)
         values
-        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+        (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
       END
     sql_select = "select * from TEST order by I"
     sql_sum = "select sum(I), sum(SI), sum(BI), sum(F), sum(D), sum(N92), sum(D92), sum(N154) from TEST"
@@ -137,7 +138,7 @@ class DataTypesTestCases < Test::Unit::TestCase
             gen_f(i), gen_d(i),
             gen_c(i), gen_c10(i), gen_vc(i), gen_vc10(i), gen_vc10000(i), 
             gen_dt(i), gen_tm(i), gen_ts(i),
-            gen_n92(i), gen_d92(i), gen_n92(i))
+            gen_n92(i), gen_d92(i), gen_n92(i), gen_d92(i))
         end
       end
       connection.execute(sql_select) do |cursor|
@@ -159,6 +160,7 @@ class DataTypesTestCases < Test::Unit::TestCase
           assert_equal gen_n92(i), row["N92"], "NUMERIC"
           assert_equal gen_d92(i), row["D92"], "DECIMAL"
           assert_equal gen_n92(i), row["N154"], "NUMERIC"
+          assert_equal gen_d92(i), row["D185"], "DECIMAL"
           i += 1
         end
       end
