@@ -1,3 +1,4 @@
+require 'bigdecimal'
 require 'test/FbTestCases'
 
 class DataTypesTestCases < FbTestCase
@@ -482,7 +483,7 @@ class DataTypesTestCases < FbTestCase
           connection.execute(sql_insert, "12345.12")
           connection.execute(sql_insert, -12345.12)
           vals = connection.query(sql_select)
-          # puts vals.inspect
+          assert vals[0][0].is_a?(BigDecimal), "Numeric(9, 2) must return BigDecimal"
           assert_equal 12345.12, vals[0][0], "NUMERIC (decimal)"
           assert_equal 12345.12, vals[1][0], "NUMERIC (string)"
           assert_equal -12345.12, vals[2][0], "NUMERIC (string)"
@@ -491,19 +492,20 @@ class DataTypesTestCases < FbTestCase
           connection.execute(sql_insert, "12345.12")
           connection.execute(sql_insert, -12345.12)
           vals = connection.query(sql_select)
-          # puts vals.inspect
+          assert vals[0][0].is_a?(BigDecimal), "Decimal(9,2) must return BigDecimal"
           assert_equal 12345.12, vals[0][0], "DECIMAL (decimal)"
           assert_equal 12345.12, vals[1][0], "DECIMAL (string)"
           assert_equal -12345.12, vals[2][0], "DECIMAL (string)"
         elsif cols[i] == 'N154'
-          connection.execute(sql_insert, 12345.12)
-          connection.execute(sql_insert, "12345.12")
-          connection.execute(sql_insert, -12345.12)
+          connection.execute(sql_insert, 91520.65)
+          connection.execute(sql_insert, "91520.65")
+          connection.execute(sql_insert, -91520.65)
           vals = connection.query(sql_select)
-          # puts vals.inspect
-          assert_equal 12345.12, vals[0][0], "NUMERIC (decimal)"
-          assert_equal 12345.12, vals[1][0], "NUMERIC (string)"
-          assert_equal -12345.12, vals[2][0], "NUMERIC (string)"
+          assert vals[0][0].is_a?(BigDecimal), "Numeric(15,4) must return BigDecimal"
+          assert Float(91520.65) != vals[0][0]
+          assert_equal BigDecimal('91520.65'), vals[0][0]
+          assert_equal BigDecimal('91520.65'), vals[1][0]
+          assert_equal BigDecimal('-91520.65'), vals[2][0]
         end
       end
       connection.drop
