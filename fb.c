@@ -1931,6 +1931,19 @@ static void fb_cursor_fetch_prep(struct FbCursor *fb_cursor)
 	}
 }
 
+static VALUE sql_decimal_to_bigdecimal(long long sql_data, int scale)
+{
+	int  i;
+  char bigdecimal_buffer[23];
+  int  bigdecimal_dot;
+  sprintf(bigdecimal_buffer, "%022lld", sql_data);
+  bigdecimal_dot = strlen(bigdecimal_buffer) + scale;
+  for (i = strlen(bigdecimal_buffer); i > bigdecimal_dot; i--)
+    bigdecimal_buffer[i] = bigdecimal_buffer[i-1];
+  bigdecimal_buffer[bigdecimal_dot] = '.';
+  return rb_funcall(rb_path2class("BigDecimal"), rb_intern("new"), 1, rb_str_new2(bigdecimal_buffer));
+}
+
 static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 {
 	struct FbConnection *fb_connection;
@@ -1941,9 +1954,6 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	long dtp;
 	VALUE val;
 	VARY *vary;
-	double ratio;
-	double dval;
-	long scnt;
 	struct tm tms;
 
 	isc_blob_handle blob_handle;
@@ -2008,10 +2018,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 				case SQL_SHORT:
 					if (var->sqlscale < 0) {
-						ratio = 1;
-						for (scnt = 0; scnt > var->sqlscale; scnt--) ratio *= 10;
-						dval = (double)*(short*)var->sqldata/ratio;
-						val = rb_float_new(dval);
+            val = sql_decimal_to_bigdecimal((long long)*(ISC_SHORT*)var->sqldata, var->sqlscale);
 					} else {
 						val = INT2NUM((long)*(short*)var->sqldata);
 					}
@@ -2019,10 +2026,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 				case SQL_LONG:
 					if (var->sqlscale < 0) {
-						ratio = 1;
-						for (scnt = 0; scnt > var->sqlscale; scnt--) ratio *= 10;
-						dval = (double)*(ISC_LONG*)var->sqldata/ratio;
-						val = rb_float_new(dval);
+            val = sql_decimal_to_bigdecimal((long long)*(ISC_LONG*)var->sqldata, var->sqlscale);
 					} else {
 						val = INT2NUM(*(ISC_LONG*)var->sqldata);
 					}
@@ -2037,14 +2041,11 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					break;
 
 				case SQL_INT64:
-        				if (var->sqlscale < 0) {
-        					ratio = 1;
-        					for (scnt = 0; scnt > var->sqlscale; scnt--) ratio *= 10;
-        					dval = (double)*(ISC_INT64*)var->sqldata/ratio;
-        					val = rb_float_new(dval);
-        				} else {
-        					val = LL2NUM(*(ISC_INT64*)var->sqldata);
-        				}
+          if (var->sqlscale < 0) {
+            val = sql_decimal_to_bigdecimal(*(ISC_INT64*)var->sqldata, var->sqlscale);
+          } else {
+            val = LL2NUM(*(ISC_INT64*)var->sqldata);
+          }
 					break;
 
 				case SQL_TIMESTAMP:
@@ -3120,6 +3121,8 @@ static VALUE database_s_drop(int argc, VALUE *argv, VALUE klass)
 
 void Init_fb()
 {
+  rb_funcall(rb_mKernel, rb_intern("require"), 1, rb_str_new2("bigdecimal"));
+
 	rb_mFb = rb_define_module("Fb");
 
 	rb_cFbDatabase = rb_define_class_under(rb_mFb, "Database", rb_cData);
