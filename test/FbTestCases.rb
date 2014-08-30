@@ -1,5 +1,6 @@
 require 'fileutils'
 include FileUtils
+require 'bigdecimal'
 require 'fb'
 
 if RUBY_VERSION =~ /^2/
