@@ -1467,6 +1467,30 @@ static void fb_cursor_free(struct FbCursor *fb_cursor)
 	xfree(fb_cursor);
 }
 
+static VALUE sql_decimal_to_bigdecimal(long long sql_data, int scale)
+{
+	int  i;
+  char bigdecimal_buffer[23];
+  int  bigdecimal_dot;
+  sprintf(bigdecimal_buffer, "%022lld", sql_data);
+  bigdecimal_dot = strlen(bigdecimal_buffer) + scale;
+  for (i = strlen(bigdecimal_buffer); i > bigdecimal_dot; i--)
+    bigdecimal_buffer[i] = bigdecimal_buffer[i-1];
+  bigdecimal_buffer[bigdecimal_dot] = '.';
+  return rb_funcall(rb_path2class("BigDecimal"), rb_intern("new"), 1, rb_str_new2(bigdecimal_buffer));
+}
+
+static long long bigdecimal_to_sql_decimal(VALUE object, int scale)
+{
+  int i;
+  int ratio = 1;
+  for (i = 0; i > scale; i--)
+    ratio *= 10;
+  object = rb_funcall(rb_path2class("BigDecimal"), rb_intern("new"), 1, rb_funcall(object, rb_intern("to_s"), 0));
+  object = rb_funcall(object, rb_intern("*"), 1, INT2NUM(ratio));
+  return NUM2LL(rb_funcall(object, rb_intern("round"), 0));
+}
+
 static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VALUE *argv)
 {
 	struct FbConnection *fb_connection;
@@ -1478,9 +1502,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 	long lvalue;
 	ISC_INT64 llvalue;
 	long alignment;
-	double ratio;
 	double dvalue;
-	long scnt;
 	double dcheck;
 	VARY *vary;
 	XSQLVAR *var;
@@ -1547,16 +1569,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					if (var->sqlscale < 0) {
-						ratio = 1;
-						for (scnt = 0; scnt > var->sqlscale; scnt--)
-							ratio *= 10;
-						obj = double_from_obj(obj);
-						dvalue = NUM2DBL(obj) * ratio;
-						if (dvalue >= 0.0) {
-							lvalue = (ISC_LONG)(dvalue + 0.5);
-						} else {
-							lvalue = (ISC_LONG)(dvalue - 0.5);
-						}
+            lvalue = bigdecimal_to_sql_decimal(obj, var->sqlscale);
 					} else {
 						obj = long_from_obj(obj);
 						lvalue = NUM2LONG(obj);
@@ -1572,16 +1585,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					if (var->sqlscale < 0) {
-						ratio = 1;
-						for (scnt = 0; scnt > var->sqlscale; scnt--)
-							ratio *= 10;
-						obj = double_from_obj(obj);
-						dvalue = NUM2DBL(obj) * ratio;
-						if (dvalue >= 0.0) {
-							lvalue = (ISC_LONG)(dvalue + 0.5);
-						} else {
-							lvalue = (ISC_LONG)(dvalue - 0.5);
-						}
+            lvalue = bigdecimal_to_sql_decimal(obj, var->sqlscale);
 					} else {
 						obj = long_from_obj(obj);
 						lvalue = NUM2LONG(obj);
@@ -1624,16 +1628,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 
 					if (var->sqlscale < 0) {
-						ratio = 1;
-						for (scnt = 0; scnt > var->sqlscale; scnt--)
-							ratio *= 10;
-						obj = double_from_obj(obj);
-						dvalue = NUM2DBL(obj) * ratio;
-						if (dvalue >= 0.0) {
-							llvalue = (ISC_INT64)(dvalue + 0.5);
-						} else {
-							llvalue = (ISC_INT64)(dvalue - 0.5);
-						}
+            llvalue = bigdecimal_to_sql_decimal(obj, var->sqlscale);
 					} else {
 						obj = ll_from_obj(obj);
 						llvalue = NUM2LL(obj);
@@ -1929,19 +1924,6 @@ static void fb_cursor_fetch_prep(struct FbCursor *fb_cursor)
 		var->sqlind = (short*)(fb_cursor->o_buffer + offset);
 		offset += sizeof(short);
 	}
-}
-
-static VALUE sql_decimal_to_bigdecimal(long long sql_data, int scale)
-{
-	int  i;
-  char bigdecimal_buffer[23];
-  int  bigdecimal_dot;
-  sprintf(bigdecimal_buffer, "%022lld", sql_data);
-  bigdecimal_dot = strlen(bigdecimal_buffer) + scale;
-  for (i = strlen(bigdecimal_buffer); i > bigdecimal_dot; i--)
-    bigdecimal_buffer[i] = bigdecimal_buffer[i-1];
-  bigdecimal_buffer[bigdecimal_dot] = '.';
-  return rb_funcall(rb_path2class("BigDecimal"), rb_intern("new"), 1, rb_str_new2(bigdecimal_buffer));
 }
 
 static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
