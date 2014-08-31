@@ -325,24 +325,22 @@ static void tm_from_timestamp(struct tm *tm, VALUE obj)
 #endif
 }
 
-static VALUE long_from_obj(VALUE obj)
+static VALUE object_to_fixnum(VALUE object)
 {
-	ID id_to_str = rb_intern("to_str");
-	if (TYPE(obj) != T_FIXNUM && rb_respond_to(obj, id_to_str))
-	{
-		VALUE s = rb_funcall(obj, id_to_str, 0);
-		obj = rb_funcall(s, rb_intern("to_i"), 0);
-	}
-	return obj;
-}
-
-static VALUE ll_from_obj(VALUE obj)
-{
-	if (TYPE(obj) == T_STRING)
-	{
-		obj = rb_funcall(obj, rb_intern("to_i"), 0);
-	}
-	return obj;
+	if (TYPE(object) != T_FIXNUM && TYPE(object) != T_BIGNUM)
+  {
+    if (TYPE(object) == T_FLOAT || !strcmp(rb_class2name(CLASS_OF(object)), "BigDecimal"))
+      object = rb_funcall(object, rb_intern("round"), 0);
+    else if (TYPE(object) == T_STRING)
+      object = rb_funcall(rb_funcall(rb_mKernel, rb_intern("BigDecimal"), 1, object), rb_intern("round"), 0);
+    else if (!strcmp(rb_class2name(CLASS_OF(object)), "Time"))
+		  rb_raise(rb_eTypeError, "Time value not allowed as Integer");
+    else if (rb_respond_to(object, rb_intern("to_i")))
+      object = rb_funcall(object, rb_intern("to_i"), 0);
+    else
+		  rb_raise(rb_eTypeError, "Value doesn't respond to 'to_i' for conversion");
+  }
+	return (object);
 }
 
 static VALUE double_from_obj(VALUE obj)
@@ -1480,15 +1478,17 @@ static VALUE sql_decimal_to_bigdecimal(long long sql_data, int scale)
   return rb_funcall(rb_path2class("BigDecimal"), rb_intern("new"), 1, rb_str_new2(bigdecimal_buffer));
 }
 
-static long long bigdecimal_to_sql_decimal(VALUE object, int scale)
+static VALUE object_to_unscaled_bigdecimal(VALUE object, int scale)
 {
   int i;
   int ratio = 1;
   for (i = 0; i > scale; i--)
     ratio *= 10;
-  object = rb_funcall(rb_path2class("BigDecimal"), rb_intern("new"), 1, rb_funcall(object, rb_intern("to_s"), 0));
+  if (TYPE(object) == T_FLOAT)
+    object = rb_funcall(object, rb_intern("to_s"), 0);
+  object = rb_funcall(rb_path2class("BigDecimal"), rb_intern("new"), 1, object);
   object = rb_funcall(object, rb_intern("*"), 1, INT2NUM(ratio));
-  return NUM2LL(rb_funcall(object, rb_intern("round"), 0));
+  return rb_funcall(object, rb_intern("round"), 0);
 }
 
 static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VALUE *argv)
@@ -1569,12 +1569,11 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					if (var->sqlscale < 0) {
-            lvalue = bigdecimal_to_sql_decimal(obj, var->sqlscale);
+            lvalue = NUM2LONG(object_to_unscaled_bigdecimal(obj, var->sqlscale));
 					} else {
-						obj = long_from_obj(obj);
-						lvalue = NUM2LONG(obj);
+						lvalue = NUM2LONG(object_to_fixnum(obj));
 					}
-					if (lvalue < SHRT_MIN || lvalue > SHRT_MAX) {
+					if (lvalue < -32768 || lvalue > 32767) {
 						rb_raise(rb_eRangeError, "short integer overflow");
 					}
 					*(short *)var->sqldata = lvalue;
@@ -1585,13 +1584,12 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					if (var->sqlscale < 0) {
-            lvalue = bigdecimal_to_sql_decimal(obj, var->sqlscale);
+            lvalue = NUM2LONG(object_to_unscaled_bigdecimal(obj, var->sqlscale));
 					} else {
-						obj = long_from_obj(obj);
-						lvalue = NUM2LONG(obj);
+						lvalue = NUM2LONG(object_to_fixnum(obj));
 					}
-					if (lvalue < -2147483647 || lvalue > 2147483647) {
-                        rb_raise(rb_eRangeError, "integer overflow");
+					if (lvalue < -2147483648 || lvalue > 2147483647) {
+            rb_raise(rb_eRangeError, "integer overflow");
 					}
 					*(ISC_LONG *)var->sqldata = (ISC_LONG)lvalue;
 					offset += alignment;
@@ -1628,10 +1626,9 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 
 					if (var->sqlscale < 0) {
-            llvalue = bigdecimal_to_sql_decimal(obj, var->sqlscale);
+            llvalue = NUM2LL(object_to_unscaled_bigdecimal(obj, var->sqlscale));
 					} else {
-						obj = ll_from_obj(obj);
-						llvalue = NUM2LL(obj);
+						llvalue = NUM2LL(object_to_fixnum(obj));
 					}
 
 					*(ISC_INT64 *)var->sqldata = llvalue;

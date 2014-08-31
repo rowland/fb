@@ -58,15 +58,15 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 0, write_and_read_value(0.4)
     assert_equal 0, write_and_read_value("0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("0.4"))
-    #assert_equal 1, write_and_read_value(0.5)
-    #assert_equal 1, write_and_read_value("0.5")
-    #assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
     assert_equal 0, write_and_read_value(-0.4)
     assert_equal 0, write_and_read_value("-0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("-0.4"))
-    #assert_equal -1, write_and_read_value(-0.5)
-    #assert_equal -1, write_and_read_value("-0.5")
-    #assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal 1, write_and_read_value(0.5)
+    assert_equal 1, write_and_read_value("0.5")
+    assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
+    assert_equal -1, write_and_read_value(-0.5)
+    assert_equal -1, write_and_read_value("-0.5")
+    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
   end
 
   def test_smallint_input_type
@@ -116,15 +116,15 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 0, write_and_read_value(0.4)
     assert_equal 0, write_and_read_value("0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("0.4"))
-    #assert_equal 1, write_and_read_value(0.5)
-    #assert_equal 1, write_and_read_value("0.5")
-    #assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
     assert_equal 0, write_and_read_value(-0.4)
     assert_equal 0, write_and_read_value("-0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("-0.4"))
-    #assert_equal -1, write_and_read_value(-0.5)
-    #assert_equal -1, write_and_read_value("-0.5")
-    #assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal 1, write_and_read_value(0.5)
+    assert_equal 1, write_and_read_value("0.5")
+    assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
+    assert_equal -1, write_and_read_value(-0.5)
+    assert_equal -1, write_and_read_value("-0.5")
+    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
   end
 
   def test_integer_input_type
@@ -147,7 +147,6 @@ class NumericDataTypesTestCases < FbTestCase
 
   def test_bigint_max
     prepare_test_table("bigint")
-    # max limit #
     assert_equal 9223372036854775807, write_and_read_value(9223372036854775807)
     assert_equal 9223372036854775807, write_and_read_value("9223372036854775807")
     #assert_equal 9223372036854775807, write_and_read_value(9223372036854775807.0)
@@ -173,13 +172,17 @@ class NumericDataTypesTestCases < FbTestCase
   def test_bigint_rounding
     prepare_test_table("bigint")
     assert_equal 0, write_and_read_value(0.4)
+    assert_equal 0, write_and_read_value("0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("0.4"))
-    #assert_equal 1, write_and_read_value(0.5)
-    #assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
     assert_equal 0, write_and_read_value(-0.4)
+    assert_equal 0, write_and_read_value("-0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("-0.4"))
-    #assert_equal -1, write_and_read_value(-0.5)
-    #assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal 1, write_and_read_value(0.5)
+    assert_equal 1, write_and_read_value("0.5")
+    assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
+    assert_equal -1, write_and_read_value(-0.5)
+    assert_equal -1, write_and_read_value("-0.5")
+    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
   end
 
   def test_bigint_input_type
@@ -229,15 +232,15 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 0, write_and_read_value(0.4)
     assert_equal 0, write_and_read_value("0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("0.4"))
-    #assert_equal 1, write_and_read_value(0.5)
-    #assert_equal 1, write_and_read_value("0.5")
-    #assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
     assert_equal 0, write_and_read_value(-0.4)
     assert_equal 0, write_and_read_value("-0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("-0.4"))
-    #assert_equal -1, write_and_read_value(-0.5)
-    #assert_equal -1, write_and_read_value("-0.5")
-    #assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal 1, write_and_read_value(0.5)
+    assert_equal 1, write_and_read_value("0.5")
+    assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
+    assert_equal -1, write_and_read_value(-0.5)
+    assert_equal -1, write_and_read_value("-0.5")
+    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
   end
 
   def test_decimal_4_0_input_type
@@ -250,12 +253,12 @@ class NumericDataTypesTestCases < FbTestCase
 
   def test_decimal_4_0_input_range
     prepare_test_table("decimal(4, 0)")
-   # assert_raises(RangeError) { write_and_read_value(32768) }
-   # assert_raises(RangeError) { write_and_read_value("32768") }
-   # assert_raises(RangeError) { write_and_read_value(BigDecimal("32768")) }
-   # assert_raises(RangeError) { write_and_read_value(-32769) }
-   # assert_raises(RangeError) { write_and_read_value("-32769") }
-   # assert_raises(RangeError) { write_and_read_value(BigDecimal("-32769")) }
+    assert_raises(RangeError) { write_and_read_value(2147483648) }
+    assert_raises(RangeError) { write_and_read_value("2147483648") }
+    assert_raises(RangeError) { write_and_read_value(BigDecimal("2147483648")) }
+    assert_raises(RangeError) { write_and_read_value(-2147483649) }
+    assert_raises(RangeError) { write_and_read_value("-2147483649") }
+    assert_raises(RangeError) { write_and_read_value(BigDecimal("-2147483649")) }
   end
 
   def test_decimal_9_0_max
@@ -287,15 +290,15 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 0, write_and_read_value(0.4)
     assert_equal 0, write_and_read_value("0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("0.4"))
-    #assert_equal 1, write_and_read_value(0.5)
-    #assert_equal 1, write_and_read_value("0.5")
-    #assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
     assert_equal 0, write_and_read_value(-0.4)
     assert_equal 0, write_and_read_value("-0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("-0.4"))
-    #assert_equal -1, write_and_read_value(-0.5)
-    #assert_equal -1, write_and_read_value("-0.5")
-    #assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal 1, write_and_read_value(0.5)
+    assert_equal 1, write_and_read_value("0.5")
+    assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
+    assert_equal -1, write_and_read_value(-0.5)
+    assert_equal -1, write_and_read_value("-0.5")
+    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
   end
 
   def test_decimal_9_0_input_type
@@ -341,23 +344,23 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 0, write_and_read_value(0.00004)
     assert_equal 0, write_and_read_value("0.00004")
     assert_equal 0, write_and_read_value(BigDecimal.new("0.00004"))
-    #assert_equal 1, write_and_read_value(0.00005)
-    #assert_equal 1, write_and_read_value("0.00005")
-    #assert_equal 1, write_and_read_value(BigDecimal.new("0.00005"))
     assert_equal 0, write_and_read_value(-0.00004)
     assert_equal 0, write_and_read_value("-0.00004")
     assert_equal 0, write_and_read_value(BigDecimal.new("-0.00004"))
-    #assert_equal -1, write_and_read_value(-0.00005)
-    #assert_equal -1, write_and_read_value("-0.00005")
-    #assert_equal -1, write_and_read_value(BigDecimal.new("-0.00005"))
+    assert_equal BigDecimal('0.0001'), write_and_read_value(0.00005)
+    assert_equal BigDecimal('0.0001'), write_and_read_value("0.00005")
+    assert_equal BigDecimal('0.0001'), write_and_read_value(BigDecimal.new("0.00005"))
+    assert_equal BigDecimal('-0.0001'), write_and_read_value(-0.00005)
+    assert_equal BigDecimal('-0.0001'), write_and_read_value("-0.00005")
+    assert_equal BigDecimal('-0.0001'), write_and_read_value(BigDecimal.new("-0.00005"))
   end
 
   def test_decimal_9_4_input_type
     prepare_test_table("decimal(9, 4)")
     #assert_raises(TypeError) { write_and_read_value('abcde') }
-    #assert_raises(TypeError) { write_and_read_value(Date.new) }
-    #assert_raises(TypeError) { write_and_read_value(Time.new) }
-    #assert_raises(TypeError) { write_and_read_value(Object.new) }
+    assert_raises(TypeError) { write_and_read_value(Date.new) }
+    assert_raises(TypeError) { write_and_read_value(Time.new) }
+    assert_raises(TypeError) { write_and_read_value(Object.new) }
   end
 
   def test_decimal_9_4_input_range
@@ -395,23 +398,23 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 0, write_and_read_value(0.0000000004)
     assert_equal 0, write_and_read_value("0.0000000004")
     assert_equal 0, write_and_read_value(BigDecimal.new("0.0000000004"))
-    #assert_equal 1, write_and_read_value(0.0000000005)
-    #assert_equal 1, write_and_read_value("0.0000000005")
-    #assert_equal 1, write_and_read_value(BigDecimal.new("0.0000000005"))
     assert_equal 0, write_and_read_value(-0.0000000004)
     assert_equal 0, write_and_read_value("-0.0000000004")
     assert_equal 0, write_and_read_value(BigDecimal.new("-0.0000000004"))
-    #assert_equal -1, write_and_read_value(-0.000000005)
-    #assert_equal -1, write_and_read_value("-0.000000005")
-    #assert_equal -1, write_and_read_value(BigDecimal.new("-0.000000005"))
+    assert_equal BigDecimal("0.000000001"), write_and_read_value(0.0000000005)
+    assert_equal BigDecimal("0.000000001"), write_and_read_value("0.0000000005")
+    assert_equal BigDecimal("0.000000001"), write_and_read_value(BigDecimal.new("0.0000000005"))
+    assert_equal BigDecimal("-0.000000001"), write_and_read_value(-0.0000000005)
+    assert_equal BigDecimal("-0.000000001"), write_and_read_value("-0.0000000005")
+    assert_equal BigDecimal("-0.000000001"), write_and_read_value(BigDecimal.new("-0.0000000005"))
   end
 
   def test_decimal_9_9_input_type
     prepare_test_table("decimal(9, 9)")
     #assert_raises(TypeError) { write_and_read_value('abcde') }
-    #assert_raises(TypeError) { write_and_read_value(Date.new) }
-    #assert_raises(TypeError) { write_and_read_value(Time.new) }
-    #assert_raises(TypeError) { write_and_read_value(Object.new) }
+    assert_raises(TypeError) { write_and_read_value(Date.new) }
+    assert_raises(TypeError) { write_and_read_value(Time.new) }
+    assert_raises(TypeError) { write_and_read_value(Object.new) }
   end
 
   def test_decimal_9_9_input_range
@@ -451,13 +454,17 @@ class NumericDataTypesTestCases < FbTestCase
   def test_decimal_18_0_rounding
     prepare_test_table("decimal(18, 0)")
     assert_equal 0, write_and_read_value(0.4)
+    assert_equal 0, write_and_read_value("0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("0.4"))
-    #assert_equal 1, write_and_read_value(0.5)
-    #assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
     assert_equal 0, write_and_read_value(-0.4)
+    assert_equal 0, write_and_read_value("-0.4")
     assert_equal 0, write_and_read_value(BigDecimal.new("-0.4"))
-    #assert_equal -1, write_and_read_value(-0.5)
-    #assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal 1, write_and_read_value(0.5)
+    assert_equal 1, write_and_read_value("0.5")
+    assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
+    assert_equal -1, write_and_read_value(-0.5)
+    assert_equal -1, write_and_read_value("-0.5")
+    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
   end
 
   def test_decimal_18_0_input_types
@@ -513,9 +520,9 @@ class NumericDataTypesTestCases < FbTestCase
   def test_decimal_18_9_input_type
     prepare_test_table("decimal(18, 9)")
     #assert_raises(TypeError) { write_and_read_value('abcde') }
-    #assert_raises(TypeError) { write_and_read_value(Date.new) }
-    #assert_raises(TypeError) { write_and_read_value(Time.new) }
-    #assert_raises(TypeError) { write_and_read_value(Object.new) }
+    assert_raises(TypeError) { write_and_read_value(Date.new) }
+    assert_raises(TypeError) { write_and_read_value(Time.new) }
+    assert_raises(TypeError) { write_and_read_value(Object.new) }
   end
 
   def test_decimal_18_9_input_range
@@ -551,13 +558,17 @@ class NumericDataTypesTestCases < FbTestCase
   def test_decimal_18_18_rounding
     prepare_test_table("decimal(18, 18)")
     assert_equal 0, write_and_read_value(0.0000000000000000004)
+    assert_equal 0, write_and_read_value("0.0000000000000000004")
     assert_equal 0, write_and_read_value(BigDecimal.new("0.0000000000000000004"))
-    #assert_equal 1, write_and_read_value(0.0000000000000000005)
-    #assert_equal 1, write_and_read_value(BigDecimal.new("0.0000000000000000005"))
     assert_equal 0, write_and_read_value(-0.0000000000000000004)
+    assert_equal 0, write_and_read_value("-0.0000000000000000004")
     assert_equal 0, write_and_read_value(BigDecimal.new("-0.0000000000000000004"))
-    #assert_equal -1, write_and_read_value(-0.0000000000000000005)
-    #assert_equal -1, write_and_read_value(BigDecimal.new("-0.0000000000000000005"))
+    #assert_equal BigDecimal("0.000000000000000001"), write_and_read_value(0.0000000000000000005)
+    #assert_equal BigDecimal("0.000000000000000001"), write_and_read_value("0.0000000000000000005")
+    #assert_equal BigDecimal("0.000000000000000001"), write_and_read_value(BigDecimal.new("0.0000000000000000005"))
+    #assert_equal BigDecimal("-0.000000000000000001"), write_and_read_value(-0.0000000000000000005)
+    #assert_equal BigDecimal("-0.000000000000000001"), write_and_read_value("-0.0000000000000000005")
+    #assert_equal BigDecimal("-0.000000000000000001"), write_and_read_value(BigDecimal.new("-0.0000000000000000005"))
   end
 
   def test_decimal_18_18_input_type
