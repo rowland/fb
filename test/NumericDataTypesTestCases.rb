@@ -1,3 +1,4 @@
+require 'bigdecimal'
 require 'test/FbTestCases'
 
 class NumericDataTypesTestCases < FbTestCase
