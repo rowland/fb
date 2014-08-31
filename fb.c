@@ -1481,13 +1481,13 @@ static VALUE sql_decimal_to_bigdecimal(long long sql_data, int scale)
 static VALUE object_to_unscaled_bigdecimal(VALUE object, int scale)
 {
   int i;
-  int ratio = 1;
+  long ratio = 1;
   for (i = 0; i > scale; i--)
     ratio *= 10;
   if (TYPE(object) == T_FLOAT)
     object = rb_funcall(object, rb_intern("to_s"), 0);
   object = rb_funcall(rb_path2class("BigDecimal"), rb_intern("new"), 1, object);
-  object = rb_funcall(object, rb_intern("*"), 1, INT2NUM(ratio));
+  object = rb_funcall(object, rb_intern("*"), 1, LONG2NUM(ratio));
   return rb_funcall(object, rb_intern("round"), 0);
 }
 
