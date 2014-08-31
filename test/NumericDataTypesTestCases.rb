@@ -4,11 +4,6 @@ require 'test/FbTestCases'
 class NumericDataTypesTestCases < FbTestCase
   include FbTestCases
 
-  # 1. Testiar valores se esten escribiendo correctamente en la base de datos (input: strings, ints, floats, bigdecimals)
-  # 2. Testiar valores se esten leyendo correctamente
-  # 3. Testiar excepciones al sobrepasar limites
-  # 4. Testiar temas de redondeo (que no haya pérdida de precisión)
-
   def setup
     super
     @connection = Database.create(@parms).connect
