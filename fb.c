@@ -141,10 +141,6 @@ typedef struct trans_opts
 	struct trans_opts *sub_opts;
 } trans_opts;
 
-/* global data */
-/* static isc_tr_handle global_transact = 0; */	/* transaction handle */
-/* static int connection_count = 0; */
-
 /* global utilities */
 
 #define	FB_ALIGN(n, b)	((n + b - 1) & ~(b - 1))
@@ -505,21 +501,6 @@ static void fb_connection_check(struct FbConnection *fb_connection)
 	}
 }
 
-/*
-static void global_close_cursors()
-{
-	struct FbConnection *list = fb_connection_list;
-	int i;
-
-	while (list) {
-		for (i = 0; i < RARRAY(list->cursor)->len; i++) {
-			cursor_close(RARRAY(list->cursor)->ptr[i]);
-		}
-		list = list->next;
-	}
-}
-*/
-
 static void fb_connection_close_cursors(struct FbConnection *fb_connection)
 {
 	int i;
@@ -539,28 +520,6 @@ static void fb_connection_drop_cursors(struct FbConnection *fb_connection)
   rb_ary_clear(fb_connection->cursor);
 }
 
-/*
-static void fb_connection_remove(struct FbConnection *fb_connection)
-{
-	if (fb_connection_list != NULL) {
-		if (fb_connection_list == fb_connection) {
-			fb_connection_list = fb_connection_list->next;
-		} else {
-			struct FbConnection *list = fb_connection_list;
-			while (list->next) {
-				if (list->next == fb_connection) {
-					list->next = fb_connection->next;
-					break;
-				}
-				list = list->next;
-			}
-		}
-		fb_connection->db = 0;
-		connection_count--;
-	}
-}
-*/
-
 static void fb_connection_disconnect(struct FbConnection *fb_connection)
 {
 	if (fb_connection->transact) {
@@ -573,7 +532,6 @@ static void fb_connection_disconnect(struct FbConnection *fb_connection)
 		isc_detach_database(fb_connection->isc_status, &fb_connection->db);
 	}
 	fb_error_check(fb_connection->isc_status);
-	/* fb_connection_remove(fb_connection); */
 }
 
 static void fb_connection_disconnect_warn(struct FbConnection *fb_connection)
@@ -584,7 +542,6 @@ static void fb_connection_disconnect_warn(struct FbConnection *fb_connection)
 	}
 	isc_detach_database(fb_connection->isc_status, &fb_connection->db);
 	fb_error_check_warn(fb_connection->isc_status);
-	/* fb_connection_remove(fb_connection); */
 }
 
 static void fb_connection_mark(struct FbConnection *fb_connection)
@@ -954,145 +911,6 @@ error:
 	xfree(tpb);
 	rb_raise(rb_eFbError, "%s", desc);
 }
-
-/*
-static void set_teb_vec(ISC_TEB *vec, struct FbConnection *fb_connection, char *tpb, int len)
-{
-	vec->dbb_ptr = &fb_connection->db;
-	if (tpb) {
-		vec->tpb_ptr = tpb;
-		vec->tpb_len = len;
-	} else {
-		vec->tpb_ptr = 0;
-		vec->tpb_len = 0;
-	}
-}
-*/
-
-/*
-static void global_transaction_start(VALUE opt, int argc, VALUE *argv)
-{
-	ISC_STATUS isc_status[20];
-	struct FbConnection *fb_connection;
-	ISC_TEB *teb_vec = ALLOCA_N(ISC_TEB, connection_count);
-	ISC_TEB *vec = teb_vec;
-	char *tpb = 0;
-	short n;
-	int tpb_len;
-
-	if (global_transact) {
-		rb_raise(rb_eFbError, "The transaction has been already started");
-	}
-
-	if (!NIL_P(opt)) {
-		tpb = trans_parseopts(opt, &tpb_len);
-	}
-
-	if (argc > connection_count) {
-		rb_raise(rb_eFbError, "Too many databases specified for the transaction");
-	}
-	if (argc == 0) {
-		n = connection_count;
-		for (fb_connection = fb_connection_list; fb_connection; fb_connection = fb_connection->next) {
-			set_teb_vec(vec, fb_connection, tpb, tpb_len);
-			vec++;
-		}
-	} else {
-		for (n = 0; n < argc; n++) {
-			fb_connection = fb_connection_check_retrieve(argv[n]);
-			set_teb_vec(vec, fb_connection, tpb, tpb_len);
-			vec++;
-		}
-	}
-
-	isc_start_multiple(isc_status, &global_transact, n, teb_vec);
-	xfree(tpb);
-	fb_error_check(isc_status);
-}
-*/
-
-/* call-seq:
- *   commit() -> nil
- *
- * Commit the current (global) transaction.
- */
-/*
-static VALUE global_commit()
-{
-	ISC_STATUS isc_status[20];
-
-	if (global_transact) {
-		global_close_cursors();
-		isc_commit_transaction(isc_status, &global_transact);
-		fb_error_check(isc_status);
-	}
-	return Qnil;
-}
-*/
-
-/* call-seq:
- *   rollback() -> nil
- *
- * Rollback the current (global) transaction.
- */
-/*
-static VALUE global_rollback()
-{
-	ISC_STATUS isc_status[20];
-
-	if (global_transact) {
-		global_close_cursors();
-		isc_rollback_transaction(isc_status, &global_transact);
-		fb_error_check(isc_status);
-	}
-	return Qnil;
-}
-*/
-
-/* call-seq:
- *   transaction(options, *connections) -> true
- *   transaction(options, *connections) { } -> block result
- *
- * Start a (global) transaction.
- */
-/*
-static VALUE global_transaction(int argc, VALUE *argv, VALUE self)
-{
-	VALUE opt = Qnil;
-
-	if (argc > 0) {
-		opt = *argv++;
-		argc--;
-	}
-	global_transaction_start(opt, argc, argv);
-
-	if (rb_block_given_p()) {
-		int state;
-		VALUE result = rb_protect(rb_yield, 0, &state);
-		if (state) {
-			global_rollback();
-			return rb_funcall(rb_mKernel, rb_intern("raise"), 0);
-		} else {
-			global_commit();
-			return result;
-		}
-	} else {
-		return Qtrue;
-   	}
-}
-*/
-
-/* call-seq:
- *   transaction_started()? -> true or false
- *
- * Returns true if a transaction is currently active.
- */
-/*
-static VALUE global_transaction_started()
-{
-	return global_transact ? Qtrue : Qfalse;
-}
-*/
 
 static void fb_connection_transaction_start(struct FbConnection *fb_connection, VALUE opt)
 {
@@ -2589,11 +2407,6 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	fb_connection->db = handle;
 	fb_connection->transact = 0;
 	fb_connection->cursor = rb_ary_new();
-/*
-	connection_count++;
-	fb_connection->next = fb_connection_list;
-	fb_connection_list = fb_connection;
-*/
 	dialect = SQL_DIALECT_CURRENT;
 	db_dialect = fb_connection_db_SQL_Dialect(fb_connection);
 
@@ -3163,14 +2976,6 @@ void Init_fb()
 
 	rb_cFbSqlType = rb_define_class_under(rb_mFb, "SqlType", rb_cData);
 	rb_define_singleton_method(rb_cFbSqlType, "from_code", sql_type_from_code, 2);
-
-/*
-	rb_cFbGlobal = rb_define_class_under(rb_mFb, "Global", rb_cData);
-	rb_define_singleton_method(rb_cFbGlobal, "transaction", global_transaction, -1);
-	rb_define_singleton_method(rb_cFbGlobal, "transaction_started", global_transaction_started, 0);
-	rb_define_singleton_method(rb_cFbGlobal, "commit", global_commit, 0);
-	rb_define_singleton_method(rb_cFbGlobal, "rollback", global_rollback, 0);
-*/
 
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
 	rb_define_method(rb_eFbError, "error_code", error_error_code, 0);
