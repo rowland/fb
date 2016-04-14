@@ -11,6 +11,12 @@ class CursorTestCases < FbTestCase
         assert_instance_of Array, row
         assert_equal 4, row.size
       end
+      connection.execute("select * from rdb$database where rdb$description = 'bogus'") do |cursor|
+        assert_instance_of Cursor, cursor
+        row = cursor.fetch :array
+        assert_instance_of NilClass, row
+        assert_equal nil, row
+      end
       connection.drop
     end
   end
@@ -22,6 +28,12 @@ class CursorTestCases < FbTestCase
         row = cursor.fetch :hash
         assert_instance_of Hash, row
         assert_equal 4, row.size
+      end
+      connection.execute("select * from rdb$database where rdb$description = 'bogus'") do |cursor|
+        assert_instance_of Cursor, cursor
+        row = cursor.fetch :hash
+        assert_instance_of NilClass, row
+        assert_equal nil, row
       end
       connection.drop
     end

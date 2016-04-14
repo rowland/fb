@@ -2173,6 +2173,7 @@ static VALUE cursor_fetch(int argc, VALUE* argv, VALUE self)
 	fb_cursor_fetch_prep(fb_cursor);
 
 	ary = fb_cursor_fetch(fb_cursor);
+	if (NIL_P(ary)) return Qnil;
 	return hash_row ? fb_hash_from_ary(fb_cursor->fields_ary, ary) : ary;
 }
 
