@@ -1406,7 +1406,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					} else {
 						lvalue = NUM2LONG(object_to_fixnum(obj));
 					}
-					if (lvalue < -2147483648 || lvalue > 2147483647) {
+					if (lvalue < -2147483648LL || lvalue > 2147483647LL) {
 						rb_raise(rb_eRangeError, "integer overflow");
 					}
 					*(ISC_LONG *)var->sqldata = (ISC_LONG)lvalue;
