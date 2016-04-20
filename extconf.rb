@@ -48,7 +48,7 @@ case RUBY_PLATFORM
     $CFLAGS  = $CFLAGS + " -DOS_WIN32"
     libs.push "fbclient_ms"
   when /darwin/
-    hosttype = `uname -m`.chomp
+#    hosttype = `uname -m`.chomp
     $CFLAGS += " -DOS_UNIX"
 #    $CFLAGS.gsub!(/-arch (\w+)/) { |m| $1 == hosttype ? m : '' }
 #    $LDFLAGS.gsub!(/-arch (\w+)/) { |m| $1 == hosttype ? m : '' }
