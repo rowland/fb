@@ -40,7 +40,8 @@ end
 
 def search_firebird_path
   program_files = ENV['ProgramFiles'].gsub('\\', '/').gsub(/(\w+\s+[\w\s]+)/) { |s| s.size > 8 ? s[0,6] + '~1' : s }
-  Dir["#{program_files}/Firebird/Firebird_*"].sort.last
+  program_files_x86 = ENV['ProgramFiles'].gsub('\\', '/').gsub(/(\w+\s+[\w\s]+)/) { |s| s.size > 8 ? s[0,6] + '~2' : s }
+  result = Dir["#{program_files}/Firebird/Firebird_*"].sort.last || Dir["#{program_files_x86}/Firebird/Firebird_*"].sort.last
 end
 
 if RUBY_PLATFORM =~ /(mingw32|mswin32)/ and ARGV.grep(/^--with-opt-dir=/).empty?
