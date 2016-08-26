@@ -18,10 +18,23 @@ def unquote(string)
   string.sub(/\A(['"])?(.*?)\1?\z/m, '\2') unless string.nil?
 end
 
+def key_exists?(path)
+  begin
+    Win32::Registry::HKEY_LOCAL_MACHINE.open(path, ::Win32::Registry::KEY_READ)
+    return true
+  rescue
+    return false
+  end
+end
+
 def read_firebird_registry
   require 'win32/registry'
-  Win32::Registry::HKEY_LOCAL_MACHINE.open('SOFTWARE\Firebird Project\Firebird Server\Instances', Win32::Registry::Constants::KEY_READ) do |reg|
-    return reg.read_s('DefaultInstance') rescue nil
+  if key_exists?('SOFTWARE\Firebird Project\Firebird Server\Instances')
+    Win32::Registry::HKEY_LOCAL_MACHINE.open('SOFTWARE\Firebird Project\Firebird Server\Instances', Win32::Registry::Constants::KEY_READ) do |reg|
+      return reg.read_s('DefaultInstance') rescue nil
+    end
+  else
+    return false
   end
 end
 
@@ -34,7 +47,12 @@ if RUBY_PLATFORM =~ /(mingw32|mswin32)/ and ARGV.grep(/^--with-opt-dir=/).empty?
   opt = unquote(ENV['FIREBIRD'])    
   opt = opt || read_firebird_registry
   opt = opt || search_firebird_path
-  ARGV << "--with-opt-dir=#{opt}" if opt
+  if opt
+    ARGV << "--with-opt-dir=#{opt}"
+  else
+    puts "No any Firebird instances found in system."
+    exit
+  end   
 end
 
 require 'mkmf'
