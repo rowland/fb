@@ -80,7 +80,7 @@ static ID id_force_encoding;
 /* static char isc_info_stmt[] = { isc_info_sql_stmt_type }; */
 /* static char isc_info_buff[16]; */
 static char isc_tpb_0[] = {
-    isc_tpb_version1,		isc_tpb_write,
+    isc_tpb_version3,		isc_tpb_write,
     isc_tpb_concurrency,	isc_tpb_nowait
 };
 
@@ -109,6 +109,7 @@ struct FbConnection {
 	unsigned short db_dialect;
 	short downcase_names;
 	VALUE encoding;
+	short readonly_selects;
 	int dropped;
 	ISC_STATUS isc_status[20];
 	/* struct FbConnection *next; */
@@ -705,7 +706,7 @@ static char* trans_parseopts(VALUE opt, long *tpb_len)
 	memcpy((void*)tpb, (void*)isc_tpb_0, sizeof(isc_tpb_0));
 	used = sizeof(isc_tpb_0);
 
-	/* Analize the transaction option strings */
+	/* Analyze the transaction option strings */
 	curr_p = trans_opt_S;
 	check1_p = strtok(trans, CMND_DELIMIT);
 	if (check1_p) {
@@ -916,29 +917,19 @@ static void fb_connection_transaction_start(struct FbConnection *fb_connection, 
 {
 	char *tpb = 0;
 	long tpb_len;
-	static char isc_tpb[] = {isc_tpb_version3, isc_tpb_read, isc_tpb_nowait, isc_tpb_read_committed,
-							 isc_tpb_rec_version};
-	int read_only;
-	read_only = 0;
 
 	if (fb_connection->transact) {
 		rb_raise(rb_eFbError, "A transaction has been already started");
 	}
 
 	if (!NIL_P(opt)) {
-		if (!RB_TYPE_P(opt, T_FIXNUM)) {
-			tpb = trans_parseopts(opt, &tpb_len);
-		} else {
-			if (((long)FIX2LONG(opt)) == ((long)isc_tpb_read)) read_only = 1;
-		}
+		tpb = trans_parseopts(opt, &tpb_len);
 	} else {
 		tpb_len = 0;
 		tpb = NULL;
 	}
 
-	isc_start_transaction(fb_connection->isc_status, &fb_connection->transact, 1, &fb_connection->db,
-						  read_only == 1 ? (long) sizeof(isc_tpb) : tpb_len,
-						  read_only == 1 ? isc_tpb : tpb);
+	isc_start_transaction(fb_connection->isc_status, &fb_connection->transact, 1, &fb_connection->db, tpb_len, tpb);
 	xfree(tpb);
 	fb_error_check(fb_connection->isc_status);
 }
@@ -2088,6 +2079,55 @@ static VALUE cursor_execute2(VALUE args)
 	return result;
 }
 
+static ISC_LONG fb_statement_type(struct FbConnection *fb_connection, struct FbCursor *fb_cursor, VALUE args)
+{
+	ISC_LONG statement_type;
+	short length;
+	char isc_info_buff[16];
+	char isc_info_stmt[] = {isc_info_sql_stmt_type};
+	static char isc_tpb[] = {
+		isc_tpb_version3,
+		isc_tpb_read,
+		isc_tpb_nowait,
+		isc_tpb_read_committed,
+		isc_tpb_rec_version
+	};
+
+	VALUE copy_args = rb_ary_dup(args);
+	rb_ary_pop(copy_args); // self
+	VALUE rb_sql = rb_ary_shift(copy_args);
+	char *sql = StringValuePtr(rb_sql);
+
+	isc_start_transaction(fb_connection->isc_status, &fb_connection->transact, 1, &fb_connection->db,
+		(long) sizeof(isc_tpb), isc_tpb);
+	fb_error_check(fb_connection->isc_status);
+
+	isc_dsql_prepare(fb_connection->isc_status, &fb_connection->transact, &fb_cursor->stmt, 0, sql,
+		fb_connection_dialect(fb_connection), NULL);
+	fb_error_check(fb_connection->isc_status);
+
+	isc_dsql_sql_info(fb_connection->isc_status, &fb_cursor->stmt,
+		sizeof(isc_info_stmt), isc_info_stmt,
+		sizeof(isc_info_buff), isc_info_buff);
+	fb_error_check(fb_connection->isc_status);
+
+	if (isc_info_buff[0] == isc_info_sql_stmt_type) {
+		length = (short)isc_vax_integer(&isc_info_buff[1], 2);
+		statement_type = isc_vax_integer(&isc_info_buff[3], length);
+	} else {
+		statement_type = 0;
+	}
+	isc_commit_transaction(fb_connection->isc_status, &fb_connection->transact);
+	fb_error_check(fb_connection->isc_status);
+
+	return statement_type;
+}
+
+static VALUE rb_ro_trans_p()
+{
+	return rb_str_new2("READ ONLY NO WAIT ISOLATION LEVEL READ COMMITTED RECORD_VERSION");
+}
+
 /* call-seq:
  *   execute(sql, *args) -> nil or rows affected
  *
@@ -2119,49 +2159,16 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 	if (!fb_connection->transact) {
 		VALUE result;
 		int state;
-		int read_only_transaction;
-		read_only_transaction = 0;
-		isc_stmt_handle stmt_handle;
-		isc_tr_handle tr_handle;
-		char isc_info_buff[16];
-		char isc_info_stmt[] = {isc_info_sql_stmt_type};
-		long statement;
-		long length;
 
-		VALUE rb_sql;
-		char *sql;
-		VALUE copy_args = rb_ary_dup(args);
-		VALUE self = rb_ary_pop(copy_args);
-		rb_sql = rb_ary_shift(copy_args);
-		sql = StringValuePtr(rb_sql);
-
-		VALUE read_transaction;
-		read_transaction = LONG2FIX(isc_tpb_read);
-
-		static char isc_tpb[] = {isc_tpb_version3, isc_tpb_read, isc_tpb_nowait, isc_tpb_read_committed,
-								 isc_tpb_rec_version};
-		isc_start_transaction(fb_connection->isc_status, &fb_connection->transact, 1, &fb_connection->db,
-							  (long) sizeof(isc_tpb),
-							  isc_tpb);
-
-		isc_dsql_prepare(fb_connection->isc_status, &fb_connection->transact, &fb_cursor->stmt, 0, sql,
-						 fb_connection_dialect(fb_connection), fb_cursor->o_sqlda);
-		fb_error_check(fb_connection->isc_status);
-
-		isc_dsql_sql_info(fb_connection->isc_status, &fb_cursor->stmt,
-						  sizeof(isc_info_stmt), isc_info_stmt,
-						  sizeof(isc_info_buff), isc_info_buff);
-		fb_error_check(fb_connection->isc_status);
-
-		if (isc_info_buff[0] == isc_info_sql_stmt_type) {
-			length = isc_vax_integer(&isc_info_buff[1], 2);
-			statement = isc_vax_integer(&isc_info_buff[3], (short) length);
-		} else {
-			statement = 0;
+		ISC_LONG statement_type = 0;
+		if (fb_connection->readonly_selects) {
+			statement_type = fb_statement_type(fb_connection, fb_cursor,args);
 		}
-		fb_connection_commit(fb_connection);
-
-		fb_connection_transaction_start(fb_connection, statement == isc_info_sql_stmt_select ? read_transaction : Qnil);
+		if (statement_type == isc_info_sql_stmt_select) {
+			fb_connection_transaction_start(fb_connection, rb_ro_trans_p());
+		} else {
+			fb_connection_transaction_start(fb_connection, Qnil);
+		}
 		fb_cursor->auto_transact = fb_connection->transact;
 
 		result = rb_protect(cursor_execute2, args, &state);
@@ -2444,6 +2451,7 @@ static const char* CONNECTION_PARMS[] = {
 	"@role",
 	"@downcase_names",
 	"@encoding",
+	"@readonly_selects",
 	(char *)0
 };
 
@@ -2452,6 +2460,7 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	unsigned short dialect;
 	unsigned short db_dialect;
 	VALUE downcase_names;
+	VALUE readonly_selects;
 	const char *parm;
 	int i;
 	struct FbConnection *fb_connection;
@@ -2472,6 +2481,8 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	downcase_names = rb_iv_get(db, "@downcase_names");
 	fb_connection->downcase_names = RTEST(downcase_names);
 	fb_connection->encoding = rb_iv_get(db, "@encoding");
+	readonly_selects = rb_iv_get(db, "@readonly_selects");
+	fb_connection->readonly_selects = RTEST(readonly_selects);
 
 	for (i = 0; (parm = CONNECTION_PARMS[i]); i++) {
 		rb_iv_set(connection, parm, rb_iv_get(db, parm));
@@ -2819,6 +2830,7 @@ static VALUE database_initialize(int argc, VALUE *argv, VALUE self)
 		rb_iv_set(self, "@role", rb_hash_aref(parms, ID2SYM(rb_intern("role"))));
 		rb_iv_set(self, "@downcase_names", rb_hash_aref(parms, ID2SYM(rb_intern("downcase_names"))));
 		rb_iv_set(self, "@encoding", default_string(parms, "encoding", "ASCII-8BIT"));
+		rb_iv_set(self, "@readonly_selects", rb_hash_aref(parms, ID2SYM(rb_intern("readonly_selects"))));
 		rb_iv_set(self, "@page_size", default_int(parms, "page_size", 4096));
 	}
 	return self;
@@ -2979,6 +2991,7 @@ void Init_fb()
 	rb_define_attr(rb_cFbDatabase, "role", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "downcase_names", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "encoding", 1, 1);
+	rb_define_attr(rb_cFbDatabase, "readonly_selects", 1, 1);
 	rb_define_attr(rb_cFbDatabase, "page_size", 1, 1);
     rb_define_method(rb_cFbDatabase, "create", database_create, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "create", database_s_create, -1);
@@ -2995,6 +3008,7 @@ void Init_fb()
 	rb_define_attr(rb_cFbConnection, "role", 1, 1);
 	rb_define_attr(rb_cFbConnection, "downcase_names", 1, 1);
 	rb_define_attr(rb_cFbConnection, "encoding", 1, 1);
+	rb_define_attr(rb_cFbConnection, "readonly_selects", 1, 1);
 	rb_define_method(rb_cFbConnection, "to_s", connection_to_s, 0);
 	rb_define_method(rb_cFbConnection, "execute", connection_execute, -1);
 	rb_define_method(rb_cFbConnection, "query", connection_query, -1);

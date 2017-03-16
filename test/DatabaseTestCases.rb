@@ -32,6 +32,7 @@ class DatabaseTestCases < FbTestCase
     assert_nil db.password
     assert_nil db.charset
     assert_nil db.role
+    assert_nil db.readonly_selects
   end
 
   def test_properties_write
@@ -46,24 +47,28 @@ class DatabaseTestCases < FbTestCase
     assert_equal 'NONE', db.charset
     db.role = 'READER'
     assert_equal 'READER', db.role
+    db.readonly_selects = true
+    assert_equal true, db.readonly_selects
   end
   
   def test_initialize_hash
-    db = Database.new(@parms)
+    db = Database.new(@parms.merge(readonly_selects: true))
     assert_equal @database, db.database
     assert_equal @username, db.username
     assert_equal @password, db.password
     assert_equal 'NONE', db.charset
     assert_equal 'READER', db.role
+    assert_equal true, db.readonly_selects
   end
   
   def test_initialize_string
-    db = Database.new(@parms_s)
+    db = Database.new(@parms_s + " readonly_selects = true;")
     assert_equal @database, db.database
     assert_equal @username, db.username
     assert_equal @password, db.password
     assert_equal 'NONE', db.charset
     assert_equal 'READER', db.role
+    assert_equal "true", db.readonly_selects
   end
   
   def test_create_instance
@@ -174,4 +179,3 @@ class DatabaseTestCases < FbTestCase
     Database.drop(@parms)
   end
 end
-    

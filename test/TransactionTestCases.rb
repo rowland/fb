@@ -271,4 +271,59 @@ class TransactionTestCases < FbTestCase
       assert !conn.transaction_started
     end
   end
+
+  def test_read_only_no_wait_isolation_level_read_committed_record_version
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
+    Database.create(@parms) do |conn|
+      conn.execute(sql_schema)
+      conn.transaction { 10.times { |i| conn.execute(sql_insert, i, "NAME#{i}") } }
+      puts "after transaction:", conn.debug.to_s.bytes
+      result = conn.query(sql_select)
+      conn.transaction("READ ONLY NO WAIT ISOLATION LEVEL READ COMMITTED RECORD_VERSION") do
+        puts "in transaction:", conn.debug.to_s.bytes
+        result = conn.query(sql_select)
+      end
+    end
+  end
+
+  require 'benchmark'
+
+  def test_readonly_selects
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
+
+    Benchmark.bm do |x|
+      x.report("read-only_selects") do
+        parms = @parms.merge(:readonly_selects => true)
+        Database.create(parms) do |conn|
+          conn.execute(sql_schema)
+          conn.transaction { 10.times { |i| conn.execute(sql_insert, i, "NAME#{i}") } }
+          10000.times do
+            result = conn.query(sql_select)
+          end
+        end
+      end
+    end
+  end
+
+  def test_readwrite_selects
+    sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
+    sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
+    sql_select = "SELECT * FROM TEST ORDER BY ID"
+
+    Benchmark.bm do |x|
+      x.report("read-write_selects") do
+        Database.create(@parms) do |conn|
+          conn.execute(sql_schema)
+          conn.transaction { 10.times { |i| conn.execute(sql_insert, i, "NAME#{i}") } }
+          10000.times do
+            result = conn.query(sql_select)
+          end
+        end
+      end
+    end
+  end
 end
