@@ -15,7 +15,7 @@ class CursorTestCases < FbTestCase
         assert_instance_of Cursor, cursor
         row = cursor.fetch :array
         assert_instance_of NilClass, row
-        assert_equal nil, row
+        assert_nil row
       end
       connection.drop
     end
@@ -33,7 +33,7 @@ class CursorTestCases < FbTestCase
         assert_instance_of Cursor, cursor
         row = cursor.fetch :hash
         assert_instance_of NilClass, row
-        assert_equal nil, row
+        assert_nil row
       end
       connection.drop
     end
