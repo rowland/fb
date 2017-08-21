@@ -916,19 +916,29 @@ static void fb_connection_transaction_start(struct FbConnection *fb_connection, 
 {
 	char *tpb = 0;
 	long tpb_len;
+	static char isc_tpb[] = {isc_tpb_version3, isc_tpb_read, isc_tpb_nowait, isc_tpb_read_committed,
+							 isc_tpb_rec_version};
+	int read_only;
+	read_only = 0;
 
 	if (fb_connection->transact) {
 		rb_raise(rb_eFbError, "A transaction has been already started");
 	}
 
 	if (!NIL_P(opt)) {
-		tpb = trans_parseopts(opt, &tpb_len);
+		if (!RB_TYPE_P(opt, T_FIXNUM)) {
+			tpb = trans_parseopts(opt, &tpb_len);
+		} else {
+			if (((long)FIX2LONG(opt)) == ((long)isc_tpb_read)) read_only = 1;
+		}
 	} else {
 		tpb_len = 0;
 		tpb = NULL;
 	}
 
-	isc_start_transaction(fb_connection->isc_status, &fb_connection->transact, 1, &fb_connection->db, tpb_len, tpb);
+	isc_start_transaction(fb_connection->isc_status, &fb_connection->transact, 1, &fb_connection->db,
+						  read_only == 1 ? (long) sizeof(isc_tpb) : tpb_len,
+						  read_only == 1 ? isc_tpb : tpb);
 	xfree(tpb);
 	fb_error_check(fb_connection->isc_status);
 }
@@ -2109,8 +2119,49 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 	if (!fb_connection->transact) {
 		VALUE result;
 		int state;
+		int read_only_transaction;
+		read_only_transaction = 0;
+		isc_stmt_handle stmt_handle;
+		isc_tr_handle tr_handle;
+		char isc_info_buff[16];
+		char isc_info_stmt[] = {isc_info_sql_stmt_type};
+		long statement;
+		long length;
 
-		fb_connection_transaction_start(fb_connection, Qnil);
+		VALUE rb_sql;
+		char *sql;
+		VALUE copy_args = rb_ary_dup(args);
+		VALUE self = rb_ary_pop(copy_args);
+		rb_sql = rb_ary_shift(copy_args);
+		sql = StringValuePtr(rb_sql);
+
+		VALUE read_transaction;
+		read_transaction = LONG2FIX(isc_tpb_read);
+
+		static char isc_tpb[] = {isc_tpb_version3, isc_tpb_read, isc_tpb_nowait, isc_tpb_read_committed,
+								 isc_tpb_rec_version};
+		isc_start_transaction(fb_connection->isc_status, &fb_connection->transact, 1, &fb_connection->db,
+							  (long) sizeof(isc_tpb),
+							  isc_tpb);
+
+		isc_dsql_prepare(fb_connection->isc_status, &fb_connection->transact, &fb_cursor->stmt, 0, sql,
+						 fb_connection_dialect(fb_connection), fb_cursor->o_sqlda);
+		fb_error_check(fb_connection->isc_status);
+
+		isc_dsql_sql_info(fb_connection->isc_status, &fb_cursor->stmt,
+						  sizeof(isc_info_stmt), isc_info_stmt,
+						  sizeof(isc_info_buff), isc_info_buff);
+		fb_error_check(fb_connection->isc_status);
+
+		if (isc_info_buff[0] == isc_info_sql_stmt_type) {
+			length = isc_vax_integer(&isc_info_buff[1], 2);
+			statement = isc_vax_integer(&isc_info_buff[3], (short) length);
+		} else {
+			statement = 0;
+		}
+		fb_connection_commit(fb_connection);
+
+		fb_connection_transaction_start(fb_connection, statement == isc_info_sql_stmt_select ? read_transaction : Qnil);
 		fb_cursor->auto_transact = fb_connection->transact;
 
 		result = rb_protect(cursor_execute2, args, &state);
