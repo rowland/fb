@@ -259,3 +259,4 @@ $(DLLIB): $(OBJS) Makefile
 
 
 $(OBJS): $(HDRS) $(ruby_headers)
+1
