@@ -1,4 +1,4 @@
-require 'test/FbTestCases'
+require './test/FbTestCases'
 
 class ConnectionTestCases < FbTestCase
   include FbTestCases
@@ -20,27 +20,43 @@ class ConnectionTestCases < FbTestCase
   def test_query_select
     sql_select = "SELECT * FROM RDB$DATABASE"
     Database.create(@parms) do |connection|
+    
       d = connection.query(sql_select)
       assert_instance_of Array, d
       assert_equal 1, d.size
       assert_instance_of Array, d.first
-      assert_equal 4, d.first.size
-
+      if @fb_version == 3
+        assert_equal 5, d.first.size
+      else
+        assert_equal 4, d.first.size
+      end
+  
       a = connection.query(:array, sql_select)
       assert_instance_of Array, a
       assert_equal 1, a.size
       assert_instance_of Array, a.first
-      assert_equal 4, a.first.size
+      if @fb_version == 3
+        assert_equal 5, a.first.size
+      else
+        assert_equal 4, a.first.size
+      end
 
       h = connection.query(:hash, sql_select)
       assert_instance_of Array, h
       assert_equal 1, h.size
       assert_instance_of Hash, h.first
-      assert_equal 4, h.first.keys.size
+      if @fb_version == 3
+        assert_equal 5, h.first.keys.size
+      else
+        assert_equal 4, h.first.keys.size
+      end
       assert h.first.keys.include?("RDB$DESCRIPTION")
       assert h.first.keys.include?("RDB$RELATION_ID")
       assert h.first.keys.include?("RDB$SECURITY_CLASS")
       assert h.first.keys.include?("RDB$CHARACTER_SET_NAME")
+      if @fb_version == 3
+        assert h.first.keys.include?("RDB$LINGER")
+      end
     end
   end
   
