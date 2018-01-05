@@ -1,0 +1,8 @@
+
+Makefile
+fb.so
+*.o
+*.bak
+mkmf.log
+.*.time
+*.swp
