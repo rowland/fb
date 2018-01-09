@@ -1,4 +1,4 @@
-require './test/FbTestCases'
+require 'test/FbTestCases'
 
 class ConnectionTestCases < FbTestCase
   include FbTestCases
