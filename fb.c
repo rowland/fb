@@ -405,10 +405,10 @@ static VALUE fb_sql_type_from_code(int code, int subtype)
 			sql_type = "ARRAY";
 			break;
 #if (FB_API_VER >= 30)
-    case SQL_BOOLEAN:
-    case blr_boolean:
-      sql_type = "BOOLEAN";
-      break;
+                case SQL_BOOLEAN:
+                case blr_boolean:
+                        sql_type = "BOOLEAN";
+                        break;
 #endif
 		case SQL_QUAD:
 		case blr_quad:
@@ -1528,12 +1528,12 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 #endif
 
 #if (FB_API_VER >= 30)
-        case SQL_BOOLEAN:
-          offset = FB_ALIGN(offset, alignment);
+                                case SQL_BOOLEAN:
+                                        offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					*(bool *)var->sqldata = obj;
 					offset += alignment;					
-        break;
+                                        break;
 #endif
 				default :
 					rb_raise(rb_eFbError, "Specified table includes unsupported datatype (%d)", dtp);
@@ -1627,7 +1627,7 @@ static VALUE precision_from_sqlvar(XSQLVAR *sqlvar)
 		case SQL_BLOB:		return Qnil;
 		case SQL_ARRAY:		return Qnil;
 #if (FB_API_VER >= 30)
-    case SQL_BOOLEAN: return Qnil;
+                case SQL_BOOLEAN: return Qnil;
 #endif
 		case SQL_QUAD:		return Qnil;
 		case SQL_TYPE_TIME:	return Qnil;
@@ -1926,9 +1926,9 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					break;
 
 #if (FB_API_VER >= 30)
-        case SQL_BOOLEAN:
+                                case SQL_BOOLEAN:
 					val = ((*(int*)var->sqldata) == 1) ? Qtrue : Qfalse;
-        break;
+                                        break;
 #endif
 
 				default:
