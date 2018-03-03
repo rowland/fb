@@ -40,8 +40,21 @@ module FbTestCases
       :charset => 'NONE',
       :role => 'READER' }
     @parms_s = "database = #{@db_host}:#{@db_file}; username = #{@username}; password = #{@password}; charset = NONE; role = READER;"
+    @fb_version = -1
+    rm_rf @db_file
+
+    Database.create(@parms) do |connection|
+      
+      d = connection.query("SELECT substring(rdb$get_context('SYSTEM', 'ENGINE_VERSION') from 1 for 1) from rdb$database")
+      
+      @fb_version = Integer(d.first[0])
+
+      connection.drop
+    end
+
     rm_rf @db_file
   end
+
 end
 
 class Fb::Connection

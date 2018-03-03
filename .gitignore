@@ -1,0 +1,8 @@
+
+*.swp
+*.gem
+*.so
+*.o
+*.log
+Makefile
+tags

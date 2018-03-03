@@ -41,6 +41,7 @@
 #include <ibase.h>
 #include <float.h>
 #include <time.h>
+#include <stdbool.h>
 
 
 #define	SQLDA_COLSINIT	50
@@ -403,6 +404,12 @@ static VALUE fb_sql_type_from_code(int code, int subtype)
 		case SQL_ARRAY:
 			sql_type = "ARRAY";
 			break;
+#if (FB_API_VER >= 30)
+                case SQL_BOOLEAN:
+                case blr_boolean:
+                        sql_type = "BOOLEAN";
+                        break;
+#endif
 		case SQL_QUAD:
 		case blr_quad:
 			sql_type = "DECIMAL";
@@ -1520,6 +1527,14 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 					break;
 #endif
 
+#if (FB_API_VER >= 30)
+                                case SQL_BOOLEAN:
+                                        offset = FB_ALIGN(offset, alignment);
+					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
+					*(bool *)var->sqldata = obj;
+					offset += alignment;					
+                                        break;
+#endif
 				default :
 					rb_raise(rb_eFbError, "Specified table includes unsupported datatype (%d)", dtp);
 			}
@@ -1611,6 +1626,9 @@ static VALUE precision_from_sqlvar(XSQLVAR *sqlvar)
 		case SQL_TIMESTAMP:	return Qnil;
 		case SQL_BLOB:		return Qnil;
 		case SQL_ARRAY:		return Qnil;
+#if (FB_API_VER >= 30)
+                case SQL_BOOLEAN: return Qnil;
+#endif
 		case SQL_QUAD:		return Qnil;
 		case SQL_TYPE_TIME:	return Qnil;
 		case SQL_TYPE_DATE:	return Qnil;
@@ -1791,6 +1809,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 		dtp = var->sqltype & ~1;
 
 		/* Check if column is null */
+    
 
 		if ((var->sqltype & 1) && (*var->sqlind < 0)) {
 			val = Qnil;
@@ -1905,6 +1924,12 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					rb_warn("ARRAY not supported (yet)");
 					val = Qnil;
 					break;
+
+#if (FB_API_VER >= 30)
+                                case SQL_BOOLEAN:
+					val = ((*(int*)var->sqldata) == 1) ? Qtrue : Qfalse;
+                                        break;
+#endif
 
 				default:
 					rb_raise(rb_eFbError, "Specified table includes unsupported datatype (%ld)", dtp);
