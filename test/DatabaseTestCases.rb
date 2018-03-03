@@ -147,7 +147,7 @@ class DatabaseTestCases < FbTestCase
       connection.execute("create table test (id int, test varchar(10))")
       connection.execute("create role writer")
       connection.execute("grant all on test to writer")
-      connection.execute("alter user rubytest set password 'rubytest'")
+      connection.execute("create user rubytest password 'rubytest'")
       connection.execute("grant writer to rubytest")
       connection.commit
       connection.execute("insert into test values (1, 'test role')")

@@ -177,8 +177,8 @@ class TransactionTestCases < FbTestCase
   def test_simultaneous_transactions
     db_file1 = "#{@db_file}1"
     db_file2 = "#{@db_file}2"
-    rm_rf db_file1
-    rm_rf db_file2
+    FileUtils.rm_rf db_file1
+    FileUtils.rm_rf db_file2
     parms1 = @parms.merge(:database => "#{@db_host}:#{db_file1}")
     parms2 = @parms.merge(:database => "#{@db_host}:#{db_file2}")
     Database.create(parms1) do |conn1|
