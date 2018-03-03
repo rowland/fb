@@ -2,10 +2,9 @@ require 'test/FbTestCases'
 
 class TransactionTestCases < FbTestCase
   include FbTestCases
-  
+
   def test_transaction
     Database.create(@parms) do |connection|
-      n = 0
       assert !connection.transaction_started
       connection.transaction
       assert connection.transaction_started
@@ -21,7 +20,6 @@ class TransactionTestCases < FbTestCase
 
   def test_transaction_block
     Database.create(@parms) do |connection|
-      n = 0
       assert !connection.transaction_started
       connection.transaction do
         assert connection.transaction_started
@@ -72,7 +70,7 @@ class TransactionTestCases < FbTestCase
   def test_auto_transaction_query
     Database.create(@parms) do |connection|
       assert !connection.transaction_started
-      rs = connection.query("select * from rdb$database")
+      connection.query("select * from rdb$database")
       assert !connection.transaction_started
       connection.drop
     end
@@ -83,7 +81,7 @@ class TransactionTestCases < FbTestCase
       assert !connection.transaction_started
       connection.transaction do
         assert connection.transaction_started
-        rs = connection.query("select * from rdb$database")
+        connection.query("select * from rdb$database")
         assert connection.transaction_started
       end
       assert !connection.transaction_started
@@ -262,7 +260,7 @@ class TransactionTestCases < FbTestCase
     Database.create(@parms) do |conn|
       conn.execute(sql_schema)
       conn.transaction { 10.times { |i| conn.execute(sql_insert, i, "NAME#{i}") } }
-      result = conn.query(sql_select)
+      conn.query(sql_select)
       assert !conn.transaction_started
       conn.transaction("READ COMMITTED") do
         assert conn.transaction_started
