@@ -157,7 +157,7 @@ class CursorTestCases < FbTestCase
         if @fb_version == 3
           assert_equal 5, fields.size
         else
-          assert_equal 4, fileds.size
+          assert_equal 4, fields.size
         end
         assert_equal 520, fields["rdb$description"].type_code
         assert_equal 500, fields["rdb$relation_id"].type_code
