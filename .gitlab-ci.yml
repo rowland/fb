@@ -1,0 +1,36 @@
+.base: &base
+  variables:
+    RAKE_VERSION: 10.4.2
+  before_script:
+    - apt-get update && apt-get install debconf-utils
+    - echo "firebird2.5-super       shared/firebird/sysdba_password/new_password    password        masterkey" | debconf-set-selections
+    - DEBIAN_FRONTEND=noninteractive apt-get install -y build-essential patch ruby-dev zlib1g-dev liblzma-dev firebird-dev firebird2.5-super
+    - service firebird2.5-super start
+    - gem install rake --no-ri --no-rdoc --version=$RAKE_VERSION
+    - gem build fb.gemspec
+    - gem install fb --no-ri --no-rdoc
+  script:
+    - rake
+
+ruby-1.8.7:
+  <<: *base
+  image: glappen/ruby-1.8.7:latest
+  script:
+    - rbenv rehash
+    - rake
+
+ruby-1.9.3:
+  <<: *base
+  image: zedtux/ruby-1.9.3:latest
+
+ruby-2.2:
+  <<: *base
+  image: ruby:2.2-jessie
+
+ruby-2.3:
+  <<: *base
+  image: ruby:2.3-jessie
+
+ruby-2.4:
+  <<: *base
+  image: ruby:2.4-jessie
