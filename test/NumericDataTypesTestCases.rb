@@ -1,9 +1,6 @@
-require 'bigdecimal'
-require 'test/FbTestCases'
+require File.expand_path("../test_helper", __FILE__)
 
 class NumericDataTypesTestCases < FbTestCase
-  include FbTestCases
-
   def setup
     super
     @connection = Database.create(@parms).connect
@@ -39,10 +36,10 @@ class NumericDataTypesTestCases < FbTestCase
 
   def test_smallint_min
     prepare_test_table("smallint")
-    assert_equal -32768, write_and_read_value(-32768)
-    assert_equal -32768, write_and_read_value("-32768")
-    assert_equal -32768, write_and_read_value(-32768.0)
-    assert_equal -32768, write_and_read_value(BigDecimal("-32768"))
+    assert_equal(-32768, write_and_read_value(-32768))
+    assert_equal(-32768, write_and_read_value("-32768"))
+    assert_equal(-32768, write_and_read_value(-32768.0))
+    assert_equal(-32768, write_and_read_value(BigDecimal("-32768")))
     assert write_and_read_value(-32768).is_a?(Fixnum)
     assert write_and_read_value("-32768").is_a?(Fixnum)
     assert write_and_read_value(-32768.0).is_a?(Fixnum)
@@ -60,9 +57,9 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 1, write_and_read_value(0.5)
     assert_equal 1, write_and_read_value("0.5")
     assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
-    assert_equal -1, write_and_read_value(-0.5)
-    assert_equal -1, write_and_read_value("-0.5")
-    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal(-1, write_and_read_value(-0.5))
+    assert_equal(-1, write_and_read_value("-0.5"))
+    assert_equal(-1, write_and_read_value(BigDecimal.new("-0.5")))
   end
 
   def test_smallint_input_type
@@ -97,10 +94,10 @@ class NumericDataTypesTestCases < FbTestCase
 
   def test_integer_min
     prepare_test_table("integer")
-    assert_equal -2147483648, write_and_read_value(-2147483648)
-    assert_equal -2147483648, write_and_read_value("-2147483648")
-    assert_equal -2147483648, write_and_read_value(-2147483648.0)
-    assert_equal -2147483648, write_and_read_value(BigDecimal("-2147483648"))
+    assert_equal(-2147483648, write_and_read_value(-2147483648))
+    assert_equal(-2147483648, write_and_read_value("-2147483648"))
+    assert_equal(-2147483648, write_and_read_value(-2147483648.0))
+    assert_equal(-2147483648, write_and_read_value(BigDecimal("-2147483648")))
     assert write_and_read_value(-2147483648).is_a?(Fixnum)
     assert write_and_read_value("-2147483648").is_a?(Fixnum)
     assert write_and_read_value(-2147483648.0).is_a?(Fixnum)
@@ -118,9 +115,9 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 1, write_and_read_value(0.5)
     assert_equal 1, write_and_read_value("0.5")
     assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
-    assert_equal -1, write_and_read_value(-0.5)
-    assert_equal -1, write_and_read_value("-0.5")
-    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal(-1, write_and_read_value(-0.5))
+    assert_equal(-1, write_and_read_value("-0.5"))
+    assert_equal(-1, write_and_read_value(BigDecimal.new("-0.5")))
   end
 
   def test_integer_input_type
@@ -155,10 +152,10 @@ class NumericDataTypesTestCases < FbTestCase
 
   def test_bigint_min
     prepare_test_table("bigint")
-    assert_equal -9223372036854775808, write_and_read_value(-9223372036854775808)
-    assert_equal -9223372036854775808, write_and_read_value("-9223372036854775808")
+    assert_equal(-9223372036854775808, write_and_read_value(-9223372036854775808))
+    assert_equal(-9223372036854775808, write_and_read_value("-9223372036854775808"))
     #assert_equal -9223372036854775808, write_and_read_value(-9223372036854775808.0)
-    assert_equal -9223372036854775808, write_and_read_value(BigDecimal("-9223372036854775808"))
+    assert_equal(-9223372036854775808, write_and_read_value(BigDecimal("-9223372036854775808")))
     assert write_and_read_value(-9223372036854775808).is_a?(Bignum)
     assert write_and_read_value("-9223372036854775808").is_a?(Bignum)
     #assert write_and_read_value(-9223372036854775808.0).is_a?(Bignum)
@@ -176,9 +173,9 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 1, write_and_read_value(0.5)
     assert_equal 1, write_and_read_value("0.5")
     assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
-    assert_equal -1, write_and_read_value(-0.5)
-    assert_equal -1, write_and_read_value("-0.5")
-    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal(-1, write_and_read_value(-0.5))
+    assert_equal(-1, write_and_read_value("-0.5"))
+    assert_equal(-1, write_and_read_value(BigDecimal.new("-0.5")))
   end
 
   def test_bigint_input_type
@@ -213,10 +210,10 @@ class NumericDataTypesTestCases < FbTestCase
 
   def test_decimal_4_0_min
     prepare_test_table("decimal(4, 0)")
-    assert_equal -32768, write_and_read_value(-32768)
-    assert_equal -32768, write_and_read_value("-32768")
-    assert_equal -32768, write_and_read_value(-32768.0)
-    assert_equal -32768, write_and_read_value(BigDecimal("-32768"))
+    assert_equal(-32768, write_and_read_value(-32768))
+    assert_equal(-32768, write_and_read_value("-32768"))
+    assert_equal(-32768, write_and_read_value(-32768.0))
+    assert_equal(-32768, write_and_read_value(BigDecimal("-32768")))
     assert write_and_read_value(-32768).is_a?(Fixnum)
     assert write_and_read_value("-32768").is_a?(Fixnum)
     assert write_and_read_value(-32768.0).is_a?(Fixnum)
@@ -234,9 +231,9 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 1, write_and_read_value(0.5)
     assert_equal 1, write_and_read_value("0.5")
     assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
-    assert_equal -1, write_and_read_value(-0.5)
-    assert_equal -1, write_and_read_value("-0.5")
-    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal(-1, write_and_read_value(-0.5))
+    assert_equal(-1, write_and_read_value("-0.5"))
+    assert_equal(-1, write_and_read_value(BigDecimal.new("-0.5")))
   end
 
   def test_decimal_4_0_input_type
@@ -292,9 +289,9 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 1, write_and_read_value(0.5)
     assert_equal 1, write_and_read_value("0.5")
     assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
-    assert_equal -1, write_and_read_value(-0.5)
-    assert_equal -1, write_and_read_value("-0.5")
-    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal(-1, write_and_read_value(-0.5))
+    assert_equal(-1, write_and_read_value("-0.5"))
+    assert_equal(-1, write_and_read_value(BigDecimal.new("-0.5")))
   end
 
   def test_decimal_9_0_input_type
@@ -437,10 +434,10 @@ class NumericDataTypesTestCases < FbTestCase
 
   def test_decimal_18_0_min
     prepare_test_table("decimal(18, 0)")
-    assert_equal -9223372036854775808, write_and_read_value(-9223372036854775808)
-    assert_equal -9223372036854775808, write_and_read_value("-9223372036854775808")
+    assert_equal(-9223372036854775808, write_and_read_value(-9223372036854775808))
+    assert_equal(-9223372036854775808, write_and_read_value("-9223372036854775808"))
     #assert_equal -9223372036854775808, write_and_read_value(-9223372036854775808.0)
-    assert_equal -9223372036854775808, write_and_read_value(BigDecimal("-9223372036854775808"))
+    assert_equal(-9223372036854775808, write_and_read_value(BigDecimal("-9223372036854775808")))
     assert write_and_read_value(-9223372036854775808).is_a?(Bignum)
     assert write_and_read_value("-9223372036854775808").is_a?(Bignum)
     #assert write_and_read_value(-9223372036854775808.0).is_a?(Bignum)
@@ -458,9 +455,9 @@ class NumericDataTypesTestCases < FbTestCase
     assert_equal 1, write_and_read_value(0.5)
     assert_equal 1, write_and_read_value("0.5")
     assert_equal 1, write_and_read_value(BigDecimal.new("0.5"))
-    assert_equal -1, write_and_read_value(-0.5)
-    assert_equal -1, write_and_read_value("-0.5")
-    assert_equal -1, write_and_read_value(BigDecimal.new("-0.5"))
+    assert_equal(-1, write_and_read_value(-0.5))
+    assert_equal(-1, write_and_read_value("-0.5"))
+    assert_equal(-1, write_and_read_value(BigDecimal.new("-0.5")))
   end
 
   def test_decimal_18_0_input_types

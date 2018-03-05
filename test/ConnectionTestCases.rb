@@ -1,8 +1,6 @@
-require 'test/FbTestCases'
+require File.expand_path("../test_helper", __FILE__)
 
 class ConnectionTestCases < FbTestCase
-  include FbTestCases
-  
   def test_execute
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_select = "SELECT * FROM RDB$DATABASE"
@@ -16,11 +14,11 @@ class ConnectionTestCases < FbTestCase
       connection.drop
     end
   end
-  
+
   def test_query_select
     sql_select = "SELECT * FROM RDB$DATABASE"
     Database.create(@parms) do |connection|
-    
+
       d = connection.query(sql_select)
       assert_instance_of Array, d
       assert_equal 1, d.size
@@ -30,7 +28,7 @@ class ConnectionTestCases < FbTestCase
       else
         assert_equal 4, d.first.size
       end
-  
+
       a = connection.query(:array, sql_select)
       assert_instance_of Array, a
       assert_equal 1, a.size
@@ -59,7 +57,7 @@ class ConnectionTestCases < FbTestCase
       end
     end
   end
-  
+
   def test_query_update
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_insert = "INSERT INTO TEST (ID, NAME) VALUES (?, ?)"
@@ -68,30 +66,30 @@ class ConnectionTestCases < FbTestCase
     sql_select = "SELECT * FROM TEST"
     Database.create(@parms) do |connection|
       su = connection.query(sql_schema)
-      assert_equal -1, su
-      
+      assert_equal(-1, su)
+
       i = connection.query(sql_insert, 1, "NAME")
       assert_equal 1, i
-      
+
       u = connection.query(sql_update, 1, "NAME2", 1)
       assert_equal 1, u
-      
+
       d = connection.query(sql_delete, 1)
       assert_equal 1, d
-      
+
       q = connection.query(sql_select)
       assert_instance_of Array, q
       assert_equal 0, q.size
     end
   end
-  
+
   def test_insert_blobs_text
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20), MEMO BLOB SUB_TYPE TEXT)"
     sql_insert = "INSERT INTO TEST (ID, NAME, MEMO) VALUES (?, ?, ?)"
     sql_select = "SELECT * FROM TEST ORDER BY ID"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      memo = IO.read("fb.c")
+      memo = "x" * 65535
       assert memo.size > 50000
       connection.transaction do
         10.times do |i|
@@ -115,13 +113,9 @@ class ConnectionTestCases < FbTestCase
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20), ATTACHMENT BLOB SEGMENT SIZE 1000)"
     sql_insert = "INSERT INTO TEST (ID, NAME, ATTACHMENT) VALUES (?, ?, ?)"
     sql_select = "SELECT * FROM TEST ORDER BY ID"
-    filename = "fb.c"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      attachment = File.open(filename,"rb") do |f|
-        f.read * 3
-      end
-      assert (attachment.size > 150000), "Not expected size"
+      attachment = SecureRandom.random_bytes(250_000)
       connection.transaction do
         3.times do |i|
           connection.execute(sql_insert, i, i.to_s, attachment);
@@ -187,13 +181,13 @@ class ConnectionTestCases < FbTestCase
   end
 
   def test_dialects
-    db = Database.create(@parms) do |connection|
+    Database.create(@parms) do |connection|
       assert_equal 3, connection.dialect
       assert_equal 3, connection.db_dialect
       connection.drop
     end
   end
-  
+
   def test_open?
     db = Database.create(@parms);
     connection = db.connect
@@ -202,7 +196,7 @@ class ConnectionTestCases < FbTestCase
     assert !connection.open?
     db.drop
   end
-  
+
   def test_properties_instance
     db = Database.new(@parms)
     db.create
@@ -215,7 +209,7 @@ class ConnectionTestCases < FbTestCase
       connection.drop
     end
   end
-  
+
   def test_properties_singleton
     Database.create(@parms) do |connection|
       assert_equal @parms[:database], connection.database
@@ -226,25 +220,25 @@ class ConnectionTestCases < FbTestCase
       connection.drop
     end
   end
-  
+
   def test_drop_instance
     db = Database.create(@parms)
-    assert File.exists?(@db_file)
+    assert File.exist?(@db_file)
     connection = db.connect
-    assert connection.open?    
+    assert connection.open?
     connection.drop
     assert !connection.open?
-    assert !File.exists?(@db_file)
+    assert !File.exist?(@db_file)
   end
-  
+
   def test_drop_singleton
     Database.create(@parms) do |connection|
-      assert File.exists?(@db_file)
+      assert File.exist?(@db_file)
       connection.drop
-      assert !File.exists?(@db_file)
+      assert !File.exist?(@db_file)
     end
   end
-  
+
   def test_to_s
     db = Database.new(@parms)
     db.create
@@ -256,7 +250,7 @@ class ConnectionTestCases < FbTestCase
       assert_equal "#{@parms[:database]} (CLOSED)", connection.to_s
     end
   end
-  
+
   def test_table_names
     sql_schema = <<-END
       CREATE TABLE TEST1 (ID INT);
@@ -351,7 +345,7 @@ class ConnectionTestCases < FbTestCase
       assert_equal 'WRITER', names[1]
     end
   end
-  
+
   def test_role_names_downcased
     sql_schema = <<-END
       create role reader;
@@ -364,7 +358,7 @@ class ConnectionTestCases < FbTestCase
       assert_equal 'writer', names[1]
     end
   end
-  
+
   def test_procedure_names
     sql_schema = <<-END_SQL
       CREATE PROCEDURE PLUSONE(NUM1 INTEGER) RETURNS (NUM2 INTEGER) AS
@@ -394,7 +388,7 @@ class ConnectionTestCases < FbTestCase
       assert_equal 'plusone', names[0]
     end
   end
-  
+
   def test_trigger_names
     table_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20)); CREATE GENERATOR TEST_SEQ;"
     trigger_schema = <<-END_SQL
@@ -448,16 +442,16 @@ class ConnectionTestCases < FbTestCase
       assert indexes.keys.include?('FK_DETAIL_MASTER_ID')
       assert indexes.keys.include?('IX_MASTER_NAME1')
       assert indexes.keys.include?('IX_DETAIL_ID_DESC')
-      
+
       assert indexes['PK_MASTER'].columns.include?('ID')
       assert indexes['PK_DETAIL'].columns.include?('ID')
 
       master_indexes = indexes.values.select {|ix| ix.table_name == 'MASTER' }
       assert_equal 2, master_indexes.size
-      
+
       detail_indexes = indexes.values.select {|ix| ix.table_name == 'DETAIL' }
       assert_equal 3, detail_indexes.size
-      
+
       assert_equal 'MASTER', indexes['PK_MASTER'].table_name
       assert indexes['PK_MASTER'].unique
       assert !indexes['PK_MASTER'].descending
@@ -465,7 +459,7 @@ class ConnectionTestCases < FbTestCase
       assert_equal 'MASTER', indexes['IX_MASTER_NAME1'].table_name
       assert indexes['IX_MASTER_NAME1'].unique
       assert !indexes['IX_MASTER_NAME1'].descending
-      
+
       assert_equal 'DETAIL', indexes['PK_DETAIL'].table_name
       assert indexes['PK_DETAIL'].unique
       assert !indexes['PK_DETAIL'].descending
@@ -476,8 +470,8 @@ class ConnectionTestCases < FbTestCase
 
       assert_equal 'DETAIL', indexes['IX_DETAIL_ID_DESC'].table_name
       assert !indexes['IX_DETAIL_ID_DESC'].unique
-      assert indexes['IX_DETAIL_ID_DESC'].descending      
-      
+      assert indexes['IX_DETAIL_ID_DESC'].descending
+
       connection.drop
     end
   end
@@ -514,7 +508,7 @@ class ConnectionTestCases < FbTestCase
         I INTEGER,
         SI SMALLINT,
         BI BIGINT,
-        F FLOAT, 
+        F FLOAT,
         D DOUBLE PRECISION,
         C CHAR,
         C10 CHAR(10),
@@ -552,5 +546,5 @@ class ConnectionTestCases < FbTestCase
         assert_equal column, columns[i]
       end
     end
-  end    
+  end
 end

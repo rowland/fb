@@ -148,7 +148,7 @@ typedef struct trans_opts
 #define	UPPER(c)	(((c) >= 'a' && (c)<= 'z') ? (c) - 'a' + 'A' : (c))
 #define	FREE(p)		if (p)	{ xfree(p); p = 0; }
 #define	SETNULL(p)	if (p && strlen(p) == 0)	{ p = 0; }
- // #define HERE(s) printf("%s\n", s) 
+ // #define HERE(s) printf("%s\n", s)
 #define HERE(s)
 
 static long calculate_buffsize(XSQLDA *sqlda)
@@ -255,13 +255,13 @@ static VALUE fb_mkdate(struct tm *tm)
 {
 	return rb_funcall(
 		rb_cDate, rb_intern("civil"), 3,
-		INT2FIX(1900 + tm->tm_year), INT2FIX(tm->tm_mon + 1), INT2FIX(tm->tm_mday));		
+		INT2FIX(1900 + tm->tm_year), INT2FIX(tm->tm_mon + 1), INT2FIX(tm->tm_mday));
 }
 
 static int responds_like_date(VALUE obj)
 {
-	return rb_respond_to(obj, rb_intern("year")) && 
-		rb_respond_to(obj, rb_intern("month")) && 
+	return rb_respond_to(obj, rb_intern("year")) &&
+		rb_respond_to(obj, rb_intern("month")) &&
 		rb_respond_to(obj, rb_intern("day"));
 }
 static void tm_from_date(struct tm *tm, VALUE date)
@@ -1532,7 +1532,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
                                         offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					*(bool *)var->sqldata = obj;
-					offset += alignment;					
+					offset += alignment;
                                         break;
 #endif
 				default :
@@ -1809,7 +1809,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 		dtp = var->sqltype & ~1;
 
 		/* Check if column is null */
-    
+
 
 		if ((var->sqltype & 1) && (*var->sqlind < 0)) {
 			val = Qnil;
@@ -2937,7 +2937,7 @@ static VALUE database_s_drop(int argc, VALUE *argv, VALUE klass)
 	return database_drop(obj);
 }
 
-void Init_fb()
+void Init_fb_ext()
 {
 	rb_funcall(rb_mKernel, rb_intern("require"), 1, rb_str_new2("bigdecimal"));
 
