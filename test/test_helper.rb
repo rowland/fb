@@ -41,7 +41,13 @@ class FbTestCase
 
   def get_db_conn_params(dbname = nil)
     dbname ||= "drivertest.%s.fdb" % SecureRandom.hex(24)
-    db_file = File.join(Dir.tmpdir, dbname)
+
+    db_file = case RUBY_PLATFORM
+              when /win32/
+                File.join("c:", "var", "fbdata", dbname)
+              else
+                File.join("/", "tmp", "firebird", dbname)
+              end
     {
       :database => "localhost:#{db_file}",
       :username => "sysdba",
