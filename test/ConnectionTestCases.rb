@@ -1,8 +1,6 @@
-require 'test/FbTestCases'
+require File.expand_path("../test_helper", __FILE__)
 
 class ConnectionTestCases < FbTestCase
-  include FbTestCases
-
   def test_execute
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20))"
     sql_select = "SELECT * FROM RDB$DATABASE"
@@ -91,7 +89,7 @@ class ConnectionTestCases < FbTestCase
     sql_select = "SELECT * FROM TEST ORDER BY ID"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      memo = IO.read("fb.c")
+      memo = "x" * 65535
       assert memo.size > 50000
       connection.transaction do
         10.times do |i|
@@ -115,13 +113,9 @@ class ConnectionTestCases < FbTestCase
     sql_schema = "CREATE TABLE TEST (ID INT, NAME VARCHAR(20), ATTACHMENT BLOB SEGMENT SIZE 1000)"
     sql_insert = "INSERT INTO TEST (ID, NAME, ATTACHMENT) VALUES (?, ?, ?)"
     sql_select = "SELECT * FROM TEST ORDER BY ID"
-    filename = "fb.c"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      attachment = File.open(filename,"rb") do |f|
-        f.read * 3
-      end
-      assert (attachment.size > 150000), "Not expected size"
+      attachment = SecureRandom.random_bytes(250_000)
       connection.transaction do
         3.times do |i|
           connection.execute(sql_insert, i, i.to_s, attachment);

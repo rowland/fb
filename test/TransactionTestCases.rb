@@ -1,8 +1,6 @@
-require 'test/FbTestCases'
+require File.expand_path("../test_helper", __FILE__)
 
 class TransactionTestCases < FbTestCase
-  include FbTestCases
-
   def test_transaction
     Database.create(@parms) do |connection|
       assert !connection.transaction_started

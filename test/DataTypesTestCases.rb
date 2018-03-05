@@ -1,9 +1,6 @@
-require 'bigdecimal'
-require 'test/FbTestCases'
+require File.expand_path("../test_helper", __FILE__)
 
 class DataTypesTestCases < FbTestCase
-  include FbTestCases
-
   def gen_i(i)
     i
   end
@@ -210,8 +207,7 @@ class DataTypesTestCases < FbTestCase
     sql_select = "select * from test order by id"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      memo = IO.read("fb.c")
-      assert memo.size > 50000
+      memo = "x" * 65535
       connection.transaction do
         10.times do |i|
           connection.execute(sql_insert, i, i.to_s, memo);
@@ -234,14 +230,9 @@ class DataTypesTestCases < FbTestCase
     sql_schema = "create table test (id int, name varchar(20), attachment blob segment size 1000)"
     sql_insert = "insert into test (id, name, attachment) values (?, ?, ?)"
     sql_select = "select * from test order by id"
-    #filename = "data.dat"
-    filename = "fb.c"
     Database.create(@parms) do |connection|
       connection.execute(sql_schema);
-      attachment = File.open(filename,"rb") do |f|
-        f.read * 3
-      end
-      assert((attachment.size > 150000), "Not expected size")
+      attachment = SecureRandom.random_bytes(250_000)
       connection.transaction do
         3.times do |i|
           connection.execute(sql_insert, i, i.to_s, attachment);

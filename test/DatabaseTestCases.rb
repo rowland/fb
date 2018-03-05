@@ -1,8 +1,6 @@
-require 'test/FbTestCases'
+require File.expand_path("../test_helper", __FILE__)
 
 class DatabaseTestCases < FbTestCase
-  include FbTestCases
-
   def setup
     super
     @parms = get_db_conn_params
@@ -147,6 +145,7 @@ class DatabaseTestCases < FbTestCase
       connection.execute("create table test (id int, test varchar(10))")
       connection.execute("create role writer")
       connection.execute("grant all on test to writer")
+      connection.execute("drop user rubytest") rescue nil
       connection.execute("create user rubytest password 'rubytest'")
       connection.execute("grant writer to rubytest")
       connection.commit

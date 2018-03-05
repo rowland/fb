@@ -1,9 +1,6 @@
-require 'bigdecimal'
-require 'test/FbTestCases'
+require File.expand_path("../test_helper", __FILE__)
 
 class NumericDataTypesTestCases < FbTestCase
-  include FbTestCases
-
   def setup
     super
     @connection = Database.create(@parms).connect

@@ -1,8 +1,9 @@
 require 'rubygems'
 require 'tmpdir'
 require 'fileutils'
-require 'fb'
 require 'securerandom'
+require 'bigdecimal'
+require 'fb'
 
 if RUBY_VERSION =~ /^2/
   require 'minitest/autorun'
@@ -23,7 +24,7 @@ else
   end
 end
 
-module FbTestCases
+class FbTestCase
   include Fb
 
   def setup
