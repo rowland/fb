@@ -26,9 +26,9 @@ Gem::Specification.new do |s|
     Gem::Platform::RUBY
   end
   s.extensions = ['ext/fb/extconf.rb'] if s.platform == Gem::Platform::RUBY
-  s.add_development_dependency "rake", "~> 10.4"
-  s.add_development_dependency "rake-compiler", '~> 1.0', '>= 1.0.4'
+  s.add_development_dependency "rake", ">= 0"
+  s.add_development_dependency "rake-compiler", ">= 0"
   if RUBY_VERSION =~ /^2/
-    s.add_development_dependency "minitest", "~> 5.8"
+    s.add_development_dependency "minitest", ">= 0"
   end
 end
