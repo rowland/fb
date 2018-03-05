@@ -145,11 +145,22 @@ class DatabaseTestCases < FbTestCase
       connection.execute("create table test (id int, test varchar(10))")
       connection.execute("create role writer")
       connection.execute("grant all on test to writer")
-      connection.execute("drop user rubytest") rescue nil
-      connection.execute("create user rubytest password 'rubytest'")
-      connection.execute("grant writer to rubytest")
-      connection.commit
       connection.execute("insert into test values (1, 'test role')")
+    end
+
+    connection = Database.connect(@parms)
+    begin
+      connection.execute("drop user rubytest")
+      connection.commit
+    rescue Error
+    ensure
+      connection.close rescue nil
+    end
+
+    Database.connect(@parms) do |connection|
+      connection.execute("CREATE USER rubytest password 'rubytest'")
+      connection.execute("GRANT WRITER TO rubytest")
+      connection.commit
     end
 
     Database.connect(@reader) do |connection|
@@ -167,7 +178,6 @@ class DatabaseTestCases < FbTestCase
         assert_equal 'test role', row["TEST"]
       end
     end
-    Database.drop(@parms)
   end
 end
 
