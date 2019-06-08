@@ -148,7 +148,7 @@ typedef struct trans_opts
 #define	UPPER(c)	(((c) >= 'a' && (c)<= 'z') ? (c) - 'a' + 'A' : (c))
 #define	FREE(p)		if (p)	{ xfree(p); p = 0; }
 #define	SETNULL(p)	if (p && strlen(p) == 0)	{ p = 0; }
- // #define HERE(s) printf("%s\n", s) 
+ // #define HERE(s) printf("%s\n", s)
 #define HERE(s)
 
 static long calculate_buffsize(XSQLDA *sqlda)
@@ -255,13 +255,13 @@ static VALUE fb_mkdate(struct tm *tm)
 {
 	return rb_funcall(
 		rb_cDate, rb_intern("civil"), 3,
-		INT2FIX(1900 + tm->tm_year), INT2FIX(tm->tm_mon + 1), INT2FIX(tm->tm_mday));		
+		INT2FIX(1900 + tm->tm_year), INT2FIX(tm->tm_mon + 1), INT2FIX(tm->tm_mday));
 }
 
 static int responds_like_date(VALUE obj)
 {
-	return rb_respond_to(obj, rb_intern("year")) && 
-		rb_respond_to(obj, rb_intern("month")) && 
+	return rb_respond_to(obj, rb_intern("year")) &&
+		rb_respond_to(obj, rb_intern("month")) &&
 		rb_respond_to(obj, rb_intern("day"));
 }
 static void tm_from_date(struct tm *tm, VALUE date)
@@ -405,10 +405,10 @@ static VALUE fb_sql_type_from_code(int code, int subtype)
 			sql_type = "ARRAY";
 			break;
 #if (FB_API_VER >= 30)
-                case SQL_BOOLEAN:
-                case blr_boolean:
-                        sql_type = "BOOLEAN";
-                        break;
+		case SQL_BOOLEAN:
+		case blr_boolean:
+			sql_type = "BOOLEAN";
+			break;
 #endif
 		case SQL_QUAD:
 		case blr_quad:
@@ -1528,12 +1528,12 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 #endif
 
 #if (FB_API_VER >= 30)
-                                case SQL_BOOLEAN:
-                                        offset = FB_ALIGN(offset, alignment);
+				case SQL_BOOLEAN:
+					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
 					*(bool *)var->sqldata = obj;
-					offset += alignment;					
-                                        break;
+					offset += alignment;
+					break;
 #endif
 				default :
 					rb_raise(rb_eFbError, "Specified table includes unsupported datatype (%d)", dtp);
@@ -1627,7 +1627,7 @@ static VALUE precision_from_sqlvar(XSQLVAR *sqlvar)
 		case SQL_BLOB:		return Qnil;
 		case SQL_ARRAY:		return Qnil;
 #if (FB_API_VER >= 30)
-                case SQL_BOOLEAN: return Qnil;
+		case SQL_BOOLEAN: return Qnil;
 #endif
 		case SQL_QUAD:		return Qnil;
 		case SQL_TYPE_TIME:	return Qnil;
@@ -1809,8 +1809,6 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 		dtp = var->sqltype & ~1;
 
 		/* Check if column is null */
-    
-
 		if ((var->sqltype & 1) && (*var->sqlind < 0)) {
 			val = Qnil;
 		} else {
@@ -1926,9 +1924,9 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 					break;
 
 #if (FB_API_VER >= 30)
-                                case SQL_BOOLEAN:
-					val = ((*(int*)var->sqldata) == 1) ? Qtrue : Qfalse;
-                                        break;
+				case SQL_BOOLEAN:
+					val = (*(bool*)var->sqldata) ? Qtrue : Qfalse;
+					break;
 #endif
 
 				default:
