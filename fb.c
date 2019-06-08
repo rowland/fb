@@ -1292,9 +1292,9 @@ static void fb_cursor_free(struct FbCursor *fb_cursor)
 
 static VALUE sql_decimal_to_bigdecimal(long long sql_data, int scale)
 {
-	int  i;
+	unsigned long i;
 	char bigdecimal_buffer[23];
-	int  bigdecimal_dot;
+	unsigned long bigdecimal_dot;
 	sprintf(bigdecimal_buffer, "%022lld", sql_data);
 	bigdecimal_dot = strlen(bigdecimal_buffer) + scale;
 	for (i = strlen(bigdecimal_buffer); i > bigdecimal_dot; i--)
