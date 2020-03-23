@@ -1,9 +1,6 @@
-require 'bigdecimal'
-require 'test/FbTestCases'
+require File.expand_path("../test_helper", __FILE__)
 
 class NumericDataTypesTestCases < FbTestCase
-  include FbTestCases
-
   def setup
     super
     @connection = Database.create(@parms).connect
@@ -155,8 +152,8 @@ class NumericDataTypesTestCases < FbTestCase
 
   def test_bigint_min
     prepare_test_table("bigint")
-    assert_equal -9223372036854775808, write_and_read_value(-9223372036854775808)
-    assert_equal -9223372036854775808, write_and_read_value("-9223372036854775808")
+    assert_equal(-9223372036854775808, write_and_read_value(-9223372036854775808))
+    assert_equal(-9223372036854775808, write_and_read_value("-9223372036854775808"))
     #assert_equal -9223372036854775808, write_and_read_value(-9223372036854775808.0)
     assert_equal -9223372036854775808, write_and_read_value(BigDecimal("-9223372036854775808"))
     assert write_and_read_value(-9223372036854775808).is_a?(Integer)
@@ -437,8 +434,8 @@ class NumericDataTypesTestCases < FbTestCase
 
   def test_decimal_18_0_min
     prepare_test_table("decimal(18, 0)")
-    assert_equal -9223372036854775808, write_and_read_value(-9223372036854775808)
-    assert_equal -9223372036854775808, write_and_read_value("-9223372036854775808")
+    assert_equal(-9223372036854775808, write_and_read_value(-9223372036854775808))
+    assert_equal(-9223372036854775808, write_and_read_value("-9223372036854775808"))
     #assert_equal -9223372036854775808, write_and_read_value(-9223372036854775808.0)
     assert_equal -9223372036854775808, write_and_read_value(BigDecimal("-9223372036854775808"))
     assert write_and_read_value(-9223372036854775808).is_a?(Integer)

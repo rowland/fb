@@ -1,3 +1,5 @@
+require 'fb/fb_ext'
+
 module Fb
   class Connection
     def execute_script(sql)

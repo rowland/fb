@@ -1,0 +1,22 @@
+language: ruby
+install:
+  - sudo apt-get update
+  # && sudo apt-get install debconf-utils
+  # - echo "firebird2.5-super       shared/firebird/sysdba_password/new_password    password        masterkey" | sudo debconf-set-selections
+  - sudo apt-get install -y build-essential patch ruby-dev zlib1g-dev liblzma-dev firebird-dev firebird2.5-super
+  - bundle
+before_script:
+  - export ISC_PASSWORD=$(sudo grep ISC_PASSWORD /etc/firebird/2.5/SYSDBA.password | ruby -e "puts STDIN.read.split(/[=\"]/)[2]")
+  - echo "modify sysdba -pw masterkey" | gsec -user SYSDBA -password $ISC_PASSWORD
+  - sudo mkdir -p /tmp/firebird
+  - sudo chown firebird.firebird /tmp/firebird
+  - sudo chmod 0777 /tmp/firebird
+script:
+  - bundle exec rake compile:fb_ext test
+rvm:
+  - 1.9.3
+  - 2.0.0
+  - 2.1
+  - 2.2
+  - 2.3
+  - 2.4

@@ -90,4 +90,4 @@ else
   libs.find {|lib| have_library(lib, test_func) }
 end
 
-create_makefile("fb")
+create_makefile("fb_ext")

@@ -1,8 +1,6 @@
-require 'test/FbTestCases'
+require File.expand_path("../test_helper", __FILE__)
 
 class CursorTestCases < FbTestCase
-  include FbTestCases
-
   def test_fetch_array
     Database.create(@parms) do |connection|
       connection.execute("select * from rdb$database") do |cursor|
@@ -218,7 +216,7 @@ class CursorTestCases < FbTestCase
         r2 = cursor.fetch
         assert_nil r2
         assert_raises Error do
-          r3 = cursor.fetch
+          cursor.fetch
         end
       end
       connection.execute("select * from rdb$database") do |cursor|
@@ -227,7 +225,7 @@ class CursorTestCases < FbTestCase
         r2 = cursor.fetch
         assert_nil r2
         assert_raises Error do
-          r3 = cursor.fetch
+          cursor.fetch
         end
       end
       connection.drop
@@ -250,7 +248,7 @@ class CursorTestCases < FbTestCase
       connection.drop
     end
   end
-  
+
   def test_simultaneous_cursors
     sql_schema = <<-END
       CREATE TABLE MASTER (ID INT, NAME1 VARCHAR(10));
