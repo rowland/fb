@@ -2,8 +2,8 @@ require 'rubygems'
 
 Gem::Specification.new do |s|
   s.name = "fb"
-  s.version = "0.9.2"
-  s.date = "2019-06-08"
+  s.version = "0.9.3"
+  s.date = "2022-09-19"
   s.summary = "Firebird database driver"
   s.description = "Ruby Firebird Extension Library"
   s.licenses = ["MIT"]
@@ -13,7 +13,6 @@ Gem::Specification.new do |s|
   s.email = "rowland@rowlandresearch.com"
   s.homepage = "http://github.com/rowland/fb"
   s.test_file = "test/FbTestSuite.rb"
-  s.has_rdoc = true
   s.extra_rdoc_files = ['README']
   s.rdoc_options << '--title' << 'Fb -- Ruby Firebird Extension' << '--main' << 'README' << '-x' << 'test'
   s.files = ['extconf.rb', 'fb.c', 'README', 'fb_extensions.rb'] + Dir.glob("test/*.rb")
