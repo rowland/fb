@@ -13,6 +13,7 @@
 # * Unit tests take about 10 times as long to complete using Firebird Classic.  Default xinetd.conf settings may not allow the tests to complete due to the frequency with which new attachments are made.
 # = Mac OS X (Intel)
 # * Works
+WINDOWS_PLATFORMS = /(mingw32|mswin32|x64-mingw-ucrt)/
 
 def unquote(string)
   string.sub(/\A(['"])?(.*?)\1?\z/m, '\2') unless string.nil?
@@ -44,8 +45,8 @@ def search_firebird_path
   result = Dir["#{program_files}/Firebird/Firebird_*"].sort.last || Dir["#{program_files_x86}/Firebird/Firebird_*"].sort.last
 end
 
-if RUBY_PLATFORM =~ /(mingw32|mswin32)/ and ARGV.grep(/^--with-opt-dir=/).empty?
-  opt = unquote(ENV['FIREBIRD'])    
+if RUBY_PLATFORM =~ WINDOWS_PLATFORMS and ARGV.grep(/^--with-opt-dir=/).empty?
+  opt = unquote(ENV['FIREBIRD'])
   opt = opt || read_firebird_registry
   opt = opt || search_firebird_path
   if opt
@@ -53,7 +54,7 @@ if RUBY_PLATFORM =~ /(mingw32|mswin32)/ and ARGV.grep(/^--with-opt-dir=/).empty?
   else
     puts "No any Firebird instances found in system."
     exit
-  end   
+  end
 end
 
 require 'mkmf'
@@ -63,7 +64,7 @@ libs = %w/ fbclient gds /
 case RUBY_PLATFORM
   when /bccwin32/
     libs.push "fbclient_bor"
-  when /mswin32/, /mingw32/
+  when WINDOWS_PLATFORMS
     $CFLAGS  = $CFLAGS + " -DOS_WIN32"
     libs.push "fbclient_ms"
   when /darwin/
@@ -83,7 +84,7 @@ dir_config("firebird")
 test_func = "isc_attach_database"
 
 case RUBY_PLATFORM
-when /mswin32/, /mingw32/
+when WINDOWS_PLATFORMS
   libs.find {|lib| have_library(lib) } and
     have_func(test_func, ["ibase.h"])
 else
