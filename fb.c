@@ -2727,8 +2727,7 @@ static VALUE default_int(VALUE hash, const char *key, int def)
 
 static VALUE database_allocate_instance(VALUE klass)
 {
-	NEWOBJ(obj, struct RObject);
-	OBJSETUP((VALUE)obj, klass, T_OBJECT);
+	NEWOBJ_OF(obj, struct RObject, klass, T_OBJECT);
 	return (VALUE)obj;
 }
 
