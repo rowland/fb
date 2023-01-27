@@ -2941,7 +2941,8 @@ void Init_fb()
 
 	rb_mFb = rb_define_module("Fb");
 
-	rb_cFbDatabase = rb_define_class_under(rb_mFb, "Database", rb_cData);
+	rb_cFbDatabase = rb_define_class_under(rb_mFb, "Database", rb_cObject);
+	rb_undef_alloc_func(rb_cFbDatabase);
     rb_define_alloc_func(rb_cFbDatabase, database_allocate_instance);
     rb_define_method(rb_cFbDatabase, "initialize", database_initialize, -1);
 	rb_define_attr(rb_cFbDatabase, "database", 1, 1);
@@ -2959,7 +2960,9 @@ void Init_fb()
 	rb_define_method(rb_cFbDatabase, "drop", database_drop, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "drop", database_s_drop, -1);
 
-	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
+	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cObject);
+	rb_undef_alloc_func(rb_cFbConnection);
+	rb_undef_method(CLASS_OF(rb_cFbConnection), "new");
 	rb_define_attr(rb_cFbConnection, "database", 1, 1);
 	rb_define_attr(rb_cFbConnection, "username", 1, 1);
 	rb_define_attr(rb_cFbConnection, "password", 1, 1);
@@ -2989,7 +2992,9 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "columns", connection_columns, 1);
 	/* rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0); */
 
-	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
+	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cObject);
+	rb_undef_alloc_func(rb_cFbCursor);
+	rb_undef_method(CLASS_OF(rb_cFbCursor), "new");
 	/* rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1); */
 	rb_define_method(rb_cFbCursor, "fields", cursor_fields, -1);
 	rb_define_method(rb_cFbCursor, "fetch", cursor_fetch, -1);
@@ -2998,7 +3003,9 @@ void Init_fb()
 	rb_define_method(rb_cFbCursor, "close", cursor_close, 0);
 	rb_define_method(rb_cFbCursor, "drop", cursor_drop, 0);
 
-	rb_cFbSqlType = rb_define_class_under(rb_mFb, "SqlType", rb_cData);
+	rb_cFbSqlType = rb_define_class_under(rb_mFb, "SqlType", rb_cObject);
+	rb_undef_alloc_func(rb_cFbSqlType);
+	rb_undef_method(CLASS_OF(rb_cFbSqlType), "new");
 	rb_define_singleton_method(rb_cFbSqlType, "from_code", sql_type_from_code, 2);
 
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);
