@@ -69,7 +69,7 @@ class DatabaseTestCases < FbTestCase
   def test_create_instance
     db = Database.new(@parms)
     db.create
-    assert File.exists?(@db_file)
+    assert File.exist?(@db_file)
   end
   
   def test_create_instance_block
@@ -82,17 +82,17 @@ class DatabaseTestCases < FbTestCase
       assert_equal 3, connection.dialect
       assert_equal 3, connection.db_dialect
     end
-    assert File.exists?(@db_file)
+    assert File.exist?(@db_file)
   end
   
   def test_create_singleton
     db = Database.create(@parms);
-    assert File.exists?(@db_file)
+    assert File.exist?(@db_file)
   end
 
   def test_create_singleton_with_defaults
     db = Database.create(:database => "localhost:#{@db_file}");
-    assert File.exists?(@db_file)
+    assert File.exist?(@db_file)
   end
 
   def test_create_singleton_block
@@ -103,7 +103,7 @@ class DatabaseTestCases < FbTestCase
       end
     end
     assert_instance_of Database, db
-    assert File.exists?(@db_file)
+    assert File.exist?(@db_file)
   end
   
   def test_create_bad_param
@@ -133,19 +133,19 @@ class DatabaseTestCases < FbTestCase
   end
   
   def test_drop_instance
-    assert !File.exists?(@db_file)
+    assert !File.exist?(@db_file)
     db = Database.create(@parms)
-    assert File.exists?(@db_file)
+    assert File.exist?(@db_file)
     db.drop
-    assert !File.exists?(@db_file)
+    assert !File.exist?(@db_file)
   end
   
   def test_drop_singleton
-    assert !File.exists?(@db_file)
+    assert !File.exist?(@db_file)
     Database.create(@parms)
-    assert File.exists?(@db_file)
+    assert File.exist?(@db_file)
     Database.drop(@parms)
-    assert !File.exists?(@db_file)
+    assert !File.exist?(@db_file)
   end
   
   def test_role_support
