@@ -1672,9 +1672,9 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_names)
 		dtp = var->sqltype & ~1;
 
 		if (var->aliasname_length) { /* aliasname always present? */
-			name = rb_tainted_str_new(var->aliasname, var->aliasname_length);
+			name = rb_str_new(var->aliasname, var->aliasname_length);
 		} else {
-			name = rb_tainted_str_new(var->sqlname, var->sqlname_length);
+			name = rb_str_new(var->sqlname, var->sqlname_length);
 		}
 		if (downcase_names && no_lowercase(name)) {
 			rb_funcall(name, id_downcase_bang, 0);
@@ -1816,7 +1816,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 			switch (dtp) {
 				case SQL_TEXT:
-					val = rb_tainted_str_new(var->sqldata, var->sqllen);
+					val = rb_str_new(var->sqldata, var->sqllen);
 					#if HAVE_RUBY_ENCODING_H
 					rb_funcall(val, id_force_encoding, 1, fb_connection->encoding);
 					#endif
@@ -1824,7 +1824,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 				case SQL_VARYING:
 					vary = (VARY*)var->sqldata;
-					val = rb_tainted_str_new(vary->vary_string, vary->vary_length);
+					val = rb_str_new(vary->vary_string, vary->vary_length);
 					#if HAVE_RUBY_ENCODING_H
 					rb_funcall(val, id_force_encoding, 1, fb_connection->encoding);
 					#endif
@@ -1906,7 +1906,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 								break;
 						}
 					}
-					val = rb_tainted_str_new(NULL,total_length);
+					val = rb_str_new(NULL,total_length);
 					for (p = RSTRING_PTR(val); num_segments > 0; num_segments--, p += actual_seg_len) {
 						isc_get_segment(fb_connection->isc_status, &blob_handle, &actual_seg_len, max_segment, p);
 						fb_error_check(fb_connection->isc_status);
