@@ -1672,9 +1672,9 @@ static VALUE fb_cursor_fields_ary(XSQLDA *sqlda, short downcase_names)
 		dtp = var->sqltype & ~1;
 
 		if (var->aliasname_length) { /* aliasname always present? */
-			name = rb_tainted_str_new(var->aliasname, var->aliasname_length);
+			name = rb_str_new(var->aliasname, var->aliasname_length);
 		} else {
-			name = rb_tainted_str_new(var->sqlname, var->sqlname_length);
+			name = rb_str_new(var->sqlname, var->sqlname_length);
 		}
 		if (downcase_names && no_lowercase(name)) {
 			rb_funcall(name, id_downcase_bang, 0);
@@ -1816,7 +1816,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 			switch (dtp) {
 				case SQL_TEXT:
-					val = rb_tainted_str_new(var->sqldata, var->sqllen);
+					val = rb_str_new(var->sqldata, var->sqllen);
 					#if HAVE_RUBY_ENCODING_H
 					rb_funcall(val, id_force_encoding, 1, fb_connection->encoding);
 					#endif
@@ -1824,7 +1824,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 				case SQL_VARYING:
 					vary = (VARY*)var->sqldata;
-					val = rb_tainted_str_new(vary->vary_string, vary->vary_length);
+					val = rb_str_new(vary->vary_string, vary->vary_length);
 					#if HAVE_RUBY_ENCODING_H
 					rb_funcall(val, id_force_encoding, 1, fb_connection->encoding);
 					#endif
@@ -1906,7 +1906,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 								break;
 						}
 					}
-					val = rb_tainted_str_new(NULL,total_length);
+					val = rb_str_new(NULL,total_length);
 					for (p = RSTRING_PTR(val); num_segments > 0; num_segments--, p += actual_seg_len) {
 						isc_get_segment(fb_connection->isc_status, &blob_handle, &actual_seg_len, max_segment, p);
 						fb_error_check(fb_connection->isc_status);
@@ -2727,8 +2727,7 @@ static VALUE default_int(VALUE hash, const char *key, int def)
 
 static VALUE database_allocate_instance(VALUE klass)
 {
-	NEWOBJ(obj, struct RObject);
-	OBJSETUP((VALUE)obj, klass, T_OBJECT);
+	NEWOBJ_OF(obj, struct RObject, klass, T_OBJECT);
 	return (VALUE)obj;
 }
 
@@ -2941,7 +2940,8 @@ void Init_fb()
 
 	rb_mFb = rb_define_module("Fb");
 
-	rb_cFbDatabase = rb_define_class_under(rb_mFb, "Database", rb_cData);
+	rb_cFbDatabase = rb_define_class_under(rb_mFb, "Database", rb_cObject);
+	rb_undef_alloc_func(rb_cFbDatabase);
     rb_define_alloc_func(rb_cFbDatabase, database_allocate_instance);
     rb_define_method(rb_cFbDatabase, "initialize", database_initialize, -1);
 	rb_define_attr(rb_cFbDatabase, "database", 1, 1);
@@ -2959,7 +2959,9 @@ void Init_fb()
 	rb_define_method(rb_cFbDatabase, "drop", database_drop, 0);
 	rb_define_singleton_method(rb_cFbDatabase, "drop", database_s_drop, -1);
 
-	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cData);
+	rb_cFbConnection = rb_define_class_under(rb_mFb, "Connection", rb_cObject);
+	rb_undef_alloc_func(rb_cFbConnection);
+	rb_undef_method(CLASS_OF(rb_cFbConnection), "new");
 	rb_define_attr(rb_cFbConnection, "database", 1, 1);
 	rb_define_attr(rb_cFbConnection, "username", 1, 1);
 	rb_define_attr(rb_cFbConnection, "password", 1, 1);
@@ -2989,7 +2991,9 @@ void Init_fb()
 	rb_define_method(rb_cFbConnection, "columns", connection_columns, 1);
 	/* rb_define_method(rb_cFbConnection, "cursor", connection_cursor, 0); */
 
-	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cData);
+	rb_cFbCursor = rb_define_class_under(rb_mFb, "Cursor", rb_cObject);
+	rb_undef_alloc_func(rb_cFbCursor);
+	rb_undef_method(CLASS_OF(rb_cFbCursor), "new");
 	/* rb_define_method(rb_cFbCursor, "execute", cursor_execute, -1); */
 	rb_define_method(rb_cFbCursor, "fields", cursor_fields, -1);
 	rb_define_method(rb_cFbCursor, "fetch", cursor_fetch, -1);
@@ -2998,7 +3002,9 @@ void Init_fb()
 	rb_define_method(rb_cFbCursor, "close", cursor_close, 0);
 	rb_define_method(rb_cFbCursor, "drop", cursor_drop, 0);
 
-	rb_cFbSqlType = rb_define_class_under(rb_mFb, "SqlType", rb_cData);
+	rb_cFbSqlType = rb_define_class_under(rb_mFb, "SqlType", rb_cObject);
+	rb_undef_alloc_func(rb_cFbSqlType);
+	rb_undef_method(CLASS_OF(rb_cFbSqlType), "new");
 	rb_define_singleton_method(rb_cFbSqlType, "from_code", sql_type_from_code, 2);
 
 	rb_eFbError = rb_define_class_under(rb_mFb, "Error", rb_eStandardError);

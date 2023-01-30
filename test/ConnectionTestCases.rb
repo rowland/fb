@@ -229,19 +229,19 @@ class ConnectionTestCases < FbTestCase
   
   def test_drop_instance
     db = Database.create(@parms)
-    assert File.exists?(@db_file)
+    assert File.exist?(@db_file)
     connection = db.connect
     assert connection.open?    
     connection.drop
     assert !connection.open?
-    assert !File.exists?(@db_file)
+    assert !File.exist?(@db_file)
   end
   
   def test_drop_singleton
     Database.create(@parms) do |connection|
-      assert File.exists?(@db_file)
+      assert File.exist?(@db_file)
       connection.drop
-      assert !File.exists?(@db_file)
+      assert !File.exist?(@db_file)
     end
   end
   
