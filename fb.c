@@ -2046,6 +2046,7 @@ static VALUE cursor_execute2(VALUE args)
 		length = calculate_buffsize(fb_cursor->i_sqlda);
 		if (length > fb_cursor->i_buffer_size) {
 			fb_cursor->i_buffer = xrealloc(fb_cursor->i_buffer, length);
+			memset(fb_cursor->i_buffer, 0, length);
 			fb_cursor->i_buffer_size = length;
 		}
 	}
