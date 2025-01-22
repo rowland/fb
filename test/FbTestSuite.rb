@@ -10,3 +10,4 @@ require 'TransactionTestCases'
 if RUBY_VERSION =~ /^1.9/
   require 'EncodingTestCases'
 end
+require 'bigdecimal'
