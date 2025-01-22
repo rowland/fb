@@ -499,6 +499,41 @@ static VALUE cursor_fetchall _((int, VALUE*, VALUE));
 
 static void fb_cursor_mark();
 static void fb_cursor_free();
+static void fb_connection_mark();
+static void fb_connection_free();
+
+/* ruby data types */
+
+static const rb_data_type_t fbdatabase_data_type = {
+    "FBDB",
+    {
+        NULL,
+        NULL,
+        NULL,
+        NULL,
+    },
+    0, 0, 0
+};
+
+static const rb_data_type_t fbconnection_data_type = {
+    "fbdb/connection",
+    {
+        fb_connection_mark,
+        fb_connection_free,
+        NULL,
+    },
+    0, 0, 0
+};
+
+static const rb_data_type_t fbcursor_data_type = {
+    "fbdb/cursor",
+    {
+        fb_cursor_mark,
+        fb_cursor_free,
+        NULL,
+    },
+    0, 0, 0
+};
 
 /* connection utilities */
 static void fb_connection_check(struct FbConnection *fb_connection)
@@ -970,7 +1005,7 @@ static VALUE connection_transaction(int argc, VALUE *argv, VALUE self)
 	VALUE opt = Qnil;
 
 	rb_scan_args(argc, argv, "01", &opt);
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	fb_connection_transaction_start(fb_connection, opt);
 
@@ -997,7 +1032,7 @@ static VALUE connection_transaction(int argc, VALUE *argv, VALUE self)
 static VALUE connection_transaction_started(VALUE self)
 {
 	struct FbConnection *fb_connection;
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	return fb_connection->transact ? Qtrue : Qfalse;
 }
@@ -1010,7 +1045,7 @@ static VALUE connection_transaction_started(VALUE self)
 static VALUE connection_commit(VALUE self)
 {
 	struct FbConnection *fb_connection;
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	fb_connection_commit(fb_connection);
 	return Qnil;
@@ -1024,7 +1059,7 @@ static VALUE connection_commit(VALUE self)
 static VALUE connection_rollback(VALUE self)
 {
 	struct FbConnection *fb_connection;
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	fb_connection_rollback(fb_connection);
 	return Qnil;
@@ -1041,7 +1076,7 @@ static VALUE connection_is_open(VALUE self)
 {
 	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 	return (fb_connection->db == 0) ? Qfalse : Qtrue;
 }
 
@@ -1071,10 +1106,10 @@ static VALUE connection_cursor(VALUE self)
 	struct FbConnection *fb_connection;
 	struct FbCursor *fb_cursor;
 
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 	fb_connection_check(fb_connection);
 
-	c = Data_Make_Struct(rb_cFbCursor, struct FbCursor, fb_cursor_mark, fb_cursor_free, fb_cursor);
+	c = TypedData_Make_Struct(rb_cFbCursor, struct FbCursor, &fbcursor_data_type, fb_cursor);
 	fb_cursor->connection = self;
 	fb_cursor->fields_ary = Qnil;
 	fb_cursor->fields_hash = Qnil;
@@ -1181,7 +1216,7 @@ static VALUE connection_close(VALUE self)
 {
 	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	if (fb_connection->dropped) return Qnil;
 
@@ -1201,7 +1236,7 @@ static VALUE connection_drop(VALUE self)
 {
 	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 	fb_connection->dropped = 1;
 	fb_connection_disconnect(fb_connection);
 	fb_connection_drop_cursors(fb_connection);
@@ -1218,7 +1253,7 @@ static VALUE connection_dialect(VALUE self)
 {
 	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 	fb_connection_check(fb_connection);
 
 	return INT2FIX(fb_connection->dialect);
@@ -1233,7 +1268,7 @@ static VALUE connection_db_dialect(VALUE self)
 {
 	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 	fb_connection_check(fb_connection);
 
 	return INT2FIX(fb_connection->db_dialect);
@@ -1341,7 +1376,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 	/* struct time_object *tobj; */
 	struct tm tms;
 
-	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(fb_cursor->connection, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	/* Check the number of parameters */
 	if (fb_cursor->i_sqlda->sqld != argc) {
@@ -1561,7 +1596,7 @@ static void fb_cursor_execute_withparams(struct FbCursor *fb_cursor, long argc, 
 {
 	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(fb_cursor->connection, struct FbConnection, &fbconnection_data_type, fb_connection);
 	/* Check the first object type of the parameters */
 	if (argc >= 1 && TYPE(argv[0]) == T_ARRAY) {
 		int i;
@@ -1727,7 +1762,7 @@ static void fb_cursor_fetch_prep(struct FbCursor *fb_cursor)
 
 	fb_cursor_check(fb_cursor);
 
-	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(fb_cursor->connection, struct FbConnection, &fbconnection_data_type, fb_connection);
 	fb_connection_check(fb_connection);
 
 	/* Check if open cursor */
@@ -1786,7 +1821,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 	ISC_LONG num_segments = 0;
 	ISC_LONG total_length = 0;
 
-	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(fb_cursor->connection, struct FbConnection, &fbconnection_data_type, fb_connection);
 	fb_connection_check(fb_connection);
 
 	if (fb_cursor->eof) {
@@ -2002,8 +2037,8 @@ static VALUE cursor_execute2(VALUE args)
 	char isc_info_stmt[] = { isc_info_sql_stmt_type };
 
 	VALUE self = rb_ary_pop(args);
-	Data_Get_Struct(self, struct FbCursor, fb_cursor);
-	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbCursor, &fbcursor_data_type, fb_cursor);
+	TypedData_Get_Struct(fb_cursor->connection, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	rb_sql = rb_ary_shift(args);
 	sql = StringValuePtr(rb_sql);
@@ -2120,8 +2155,8 @@ static VALUE cursor_execute(int argc, VALUE* argv, VALUE self)
 	args = rb_ary_new4(argc, argv);
 	rb_ary_push(args, self);
 
-	Data_Get_Struct(self, struct FbCursor, fb_cursor);
-	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbCursor, &fbcursor_data_type, fb_cursor);
+	TypedData_Get_Struct(fb_cursor->connection, struct FbConnection, &fbconnection_data_type, fb_connection);
 	fb_connection_check(fb_connection);
 
 	if (fb_cursor->open) {
@@ -2193,7 +2228,7 @@ static VALUE cursor_fetch(int argc, VALUE* argv, VALUE self)
 
 	int hash_row = hash_format(argc, argv);
 
-	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	TypedData_Get_Struct(self, struct FbCursor, &fbcursor_data_type, fb_cursor);
 	fb_cursor_fetch_prep(fb_cursor);
 
 	ary = fb_cursor_fetch(fb_cursor);
@@ -2218,7 +2253,7 @@ static VALUE cursor_fetchall(int argc, VALUE* argv, VALUE self)
 
 	int hash_rows = hash_format(argc, argv);
 
-	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	TypedData_Get_Struct(self, struct FbCursor, &fbcursor_data_type, fb_cursor);
 	fb_cursor_fetch_prep(fb_cursor);
 
 	ary = rb_ary_new();
@@ -2252,7 +2287,7 @@ static VALUE cursor_each(int argc, VALUE* argv, VALUE self)
 
 	int hash_rows = hash_format(argc, argv);
 
-	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	TypedData_Get_Struct(self, struct FbCursor, &fbcursor_data_type, fb_cursor);
 	fb_cursor_fetch_prep(fb_cursor);
 
 	for (;;) {
@@ -2278,8 +2313,8 @@ static VALUE cursor_close(VALUE self)
 	struct FbCursor *fb_cursor;
 	struct FbConnection *fb_connection;
 
-	Data_Get_Struct(self, struct FbCursor, fb_cursor);
-	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbCursor, &fbcursor_data_type, fb_cursor);
+	TypedData_Get_Struct(fb_cursor->connection, struct FbConnection, &fbconnection_data_type, fb_connection);
 	fb_cursor_check(fb_cursor);
 
 	/* Close the cursor */
@@ -2313,13 +2348,13 @@ static VALUE cursor_drop(VALUE self)
 	struct FbConnection *fb_connection;
 	int i;
 
-	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	TypedData_Get_Struct(self, struct FbCursor, &fbcursor_data_type, fb_cursor);
 	fb_cursor_drop(fb_cursor);
 	fb_cursor->fields_ary = Qnil;
 	fb_cursor->fields_hash = Qnil;
 
 	/* reset the reference from connection */
-	Data_Get_Struct(fb_cursor->connection, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(fb_cursor->connection, struct FbConnection, &fbconnection_data_type, fb_connection);
 	for (i = 0; i < RARRAY_LEN(fb_connection->cursor); i++) {
 		if (RARRAY_PTR(fb_connection->cursor)[i] == self) {
 			RARRAY_PTR(fb_connection->cursor)[i] = Qnil;
@@ -2342,7 +2377,7 @@ static VALUE cursor_fields(int argc, VALUE* argv, VALUE self)
 {
 	struct FbCursor *fb_cursor;
 
-	Data_Get_Struct(self, struct FbCursor, fb_cursor);
+	TypedData_Get_Struct(self, struct FbCursor, &fbcursor_data_type, fb_cursor);
 	if (argc == 0 || argv[0] == ID2SYM(rb_intern("array"))) {
 		return fb_cursor->fields_ary;
 	} else if (argv[0] == ID2SYM(rb_intern("hash"))) {
@@ -2428,7 +2463,7 @@ static VALUE connection_create(isc_db_handle handle, VALUE db)
 	const char *parm;
 	int i;
 	struct FbConnection *fb_connection;
-	VALUE connection = Data_Make_Struct(rb_cFbConnection, struct FbConnection, fb_connection_mark, fb_connection_free, fb_connection);
+    VALUE connection = TypedData_Make_Struct(rb_cFbConnection, struct FbConnection, &fbconnection_data_type, fb_connection);
 	fb_connection->db = handle;
 	fb_connection->transact = 0;
 	fb_connection->cursor = rb_ary_new();
@@ -2460,7 +2495,7 @@ static VALUE connection_names(VALUE self, const char *sql)
 	VALUE cursor = connection_execute(1, &query, self);
 	VALUE names = rb_ary_new();
 	struct FbConnection *fb_connection;
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	while ((row = cursor_fetch(0, NULL, cursor)) != Qnil) {
 		VALUE name = rb_ary_entry(row, 0);
@@ -2575,7 +2610,7 @@ static VALUE connection_columns(VALUE self, VALUE table_name)
     VALUE upcase_table_name = rb_funcall(table_name, rb_intern("upcase"), 0);
     VALUE query_parms[] = { query, upcase_table_name };
     VALUE rs = connection_query(2, query_parms, self);
-    Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
     for (i = 0; i < RARRAY_LEN(rs); i++) {
         VALUE row = rb_ary_entry(rs, i);
         VALUE name = rb_ary_entry(row, 0);
@@ -2635,7 +2670,7 @@ static VALUE connection_index_columns(VALUE self, VALUE index_name)
 	VALUE columns = rb_ary_new();
 	int i;
 	struct FbConnection *fb_connection;
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	for (i = 0; i < RARRAY_LEN(result); i++) {
 		VALUE row = rb_ary_entry(result, i);
@@ -2665,7 +2700,7 @@ static VALUE connection_indexes(VALUE self)
 	VALUE indexes = rb_hash_new();
 	int i;
 	struct FbConnection *fb_connection;
-	Data_Get_Struct(self, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(self, struct FbConnection, &fbconnection_data_type, fb_connection);
 
 	for (i = 0; i < RARRAY_LEN(ary_indexes); i++) {
 		VALUE index_struct;
@@ -2728,8 +2763,7 @@ static VALUE default_int(VALUE hash, const char *key, int def)
 
 static VALUE database_allocate_instance(VALUE klass)
 {
-	NEWOBJ_OF(obj, struct RObject, klass, T_OBJECT);
-	return (VALUE)obj;
+    return TypedData_Wrap_Struct(klass, &fbdatabase_data_type, NULL);
 }
 
 static VALUE hash_from_connection_string(VALUE cs)
@@ -2916,7 +2950,7 @@ static VALUE database_drop(VALUE self)
 	struct FbConnection *fb_connection;
 
 	VALUE connection = database_connect(self);
-	Data_Get_Struct(connection, struct FbConnection, fb_connection);
+	TypedData_Get_Struct(connection, struct FbConnection, &fbconnection_data_type, fb_connection);
 	isc_drop_database(fb_connection->isc_status, &fb_connection->db);
 	fb_error_check(fb_connection->isc_status);
 	/* fb_connection_remove(fb_connection); */
