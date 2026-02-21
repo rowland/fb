@@ -78,6 +78,10 @@ static VALUE re_lowercase;
 static ID id_rstrip_bang;
 static ID id_sub_bang;
 static ID id_force_encoding;
+static ID id_mul;
+static ID id_div;
+
+static VALUE object_to_unscaled_bigdecimal(VALUE object, int scale);
 
 static char isc_tpb_0[] = {
     isc_tpb_version1,		isc_tpb_write,
@@ -419,17 +423,42 @@ static VALUE fb_sql_type_from_code(int code, int subtype)
 			sql_type = "DATE";
 			break;
 		case SQL_INT64:
-		case blr_int64:
-			switch (subtype) {
-				case 0:		sql_type = "BIGINT";	break;
-				case 1:		sql_type = "NUMERIC";	break;
-				case 2:		sql_type = "DECIMAL";	break;
-			}
-			break;
+			case blr_int64:
+				switch (subtype) {
+					case 0:		sql_type = "BIGINT";	break;
+					case 1:		sql_type = "NUMERIC";	break;
+					case 2:		sql_type = "DECIMAL";	break;
+				}
+				break;
 #if (FB_API_VER >= 40)
 		case SQL_INT128:
-			sql_type = "INT128";
+			switch (subtype) {
+				case 0:		sql_type = "INT128";	break;
+				case 1:		sql_type = "NUMERIC";	break;
+				case 2:		sql_type = "DECIMAL";	break;
+				default:	sql_type = "INT128";	break;
+			}
 			break;
+		#ifdef SQL_DEC16
+		case SQL_DEC16:
+			sql_type = "DECFLOAT(16)";
+			break;
+		#endif
+		#ifdef SQL_DEC34
+		case SQL_DEC34:
+			sql_type = "DECFLOAT(34)";
+			break;
+		#endif
+		#ifdef SQL_TIMESTAMP_TZ
+		case SQL_TIMESTAMP_TZ:
+			sql_type = "TIMESTAMP WITH TIME ZONE";
+			break;
+		#endif
+		#ifdef SQL_TIME_TZ
+		case SQL_TIME_TZ:
+			sql_type = "TIME WITH TIME ZONE";
+			break;
+		#endif
 #endif
 		default:
 			printf("Unknown: %d, %d\n", code, subtype);
@@ -438,6 +467,91 @@ static VALUE fb_sql_type_from_code(int code, int subtype)
 	}
 	return rb_str_new2(sql_type);
 }
+
+#if defined(__SIZEOF_INT128__)
+typedef signed __int128 fb_int128_t;
+typedef unsigned __int128 fb_uint128_t;
+
+static VALUE fb_int128_to_value(const char *raw, short scale)
+{
+	fb_uint128_t bits = 0;
+	fb_uint128_t magnitude;
+	char buf[64];
+	char *p = &buf[63];
+	int negative;
+	VALUE v;
+
+	memcpy(&bits, raw, sizeof(fb_uint128_t));
+	negative = (int)(bits >> 127);
+	magnitude = negative ? (~bits + 1) : bits;
+	*p = '\0';
+
+	if (magnitude == 0) {
+		v = INT2NUM(0);
+	} else {
+		while (magnitude > 0) {
+			*--p = (char)('0' + (int)(magnitude % 10));
+			magnitude /= 10;
+		}
+		if (negative) {
+			*--p = '-';
+		}
+		v = rb_cstr_to_inum(p, 10, 1);
+	}
+
+	if (scale < 0) {
+		VALUE ratio = INT2NUM(1);
+		int i;
+		for (i = 0; i < -scale; i++) {
+			ratio = rb_funcall(ratio, id_mul, 1, INT2FIX(10));
+		}
+		v = rb_funcall(rb_cObject, rb_intern("BigDecimal"), 1, rb_funcall(v, rb_intern("to_s"), 0));
+		v = rb_funcall(v, id_div, 1, ratio);
+	}
+
+	return v;
+}
+
+static void value_to_fb_int128(VALUE obj, short scale, char *raw)
+{
+	fb_uint128_t magnitude = 0;
+	fb_uint128_t limit;
+	fb_uint128_t bits;
+	const char *s;
+	int neg = 0;
+
+	if (scale < 0) {
+		obj = object_to_unscaled_bigdecimal(obj, scale);
+	} else {
+		obj = object_to_fixnum(obj);
+	}
+
+	{
+		VALUE str = rb_funcall(obj, rb_intern("to_s"), 0);
+		s = StringValueCStr(str);
+	}
+	if (*s == '-') {
+		neg = 1;
+		s++;
+	}
+
+	limit = neg ? ((fb_uint128_t)1 << 127) : (((fb_uint128_t)1 << 127) - 1);
+
+	while (*s) {
+		if (*s < '0' || *s > '9') {
+			rb_raise(rb_eRangeError, "invalid INT128 value");
+		}
+		if (magnitude > (limit - (fb_uint128_t)(*s - '0')) / 10) {
+			rb_raise(rb_eRangeError, "INT128 overflow");
+		}
+		magnitude = (magnitude * 10) + (fb_uint128_t)(*s - '0');
+		s++;
+	}
+
+	bits = neg ? (~magnitude + 1) : magnitude;
+	memcpy(raw, &bits, sizeof(fb_uint128_t));
+}
+#endif
 
 /* call-seq:
  *   from_code(code, subtype) -> String
@@ -1557,7 +1671,7 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 				case SQL_BOOLEAN:
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
-					*(bool *)var->sqldata = obj;
+					*(bool *)var->sqldata = RTEST(obj);
 					offset += alignment;
 					break;
 #endif
@@ -1566,12 +1680,11 @@ static void fb_cursor_set_inputparams(struct FbCursor *fb_cursor, long argc, VAL
 				case SQL_INT128:
 					offset = FB_ALIGN(offset, alignment);
 					var->sqldata = (char *)(fb_cursor->i_buffer + offset);
-					if (var->sqlscale < 0) {
-						llvalue = NUM2LL(object_to_unscaled_bigdecimal(obj, var->sqlscale));
-					} else {
-						llvalue = NUM2LL(object_to_fixnum(obj));
-					}
-					*(ISC_INT64 *)var->sqldata = llvalue;
+#if defined(__SIZEOF_INT128__)
+					value_to_fb_int128(obj, var->sqlscale, var->sqldata);
+#else
+					rb_raise(rb_eFbError, "INT128 requires compiler support for __int128");
+#endif
 					offset += alignment;
 					break;
 #endif
@@ -1676,6 +1789,15 @@ static VALUE precision_from_sqlvar(XSQLVAR *sqlvar)
 				case 2:		return INT2FIX(18);
 			}
 			break;
+#if (FB_API_VER >= 40)
+		case SQL_INT128:
+			switch (sqlvar->sqlsubtype) {
+				case 0:		return INT2FIX(0);
+				case 1:		return INT2FIX(38);
+				case 2:		return INT2FIX(38);
+			}
+			break;
+#endif
 	}
 	return Qnil;
 }
@@ -1976,7 +2098,7 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 							/* Guard against writing past the pre-allocated buffer */
 							if (bytes_read + actual_seg_len > total_length) {
 								rb_str_resize(val, bytes_read + actual_seg_len);
-								total_length = bytes_read + actual_seg_len;
+								total_length = (ISC_LONG)(bytes_read + actual_seg_len);
 							}
 							memcpy(RSTRING_PTR(val) + bytes_read, blob_read_buf, actual_seg_len);
 							bytes_read += actual_seg_len;
@@ -2028,11 +2150,11 @@ static VALUE fb_cursor_fetch(struct FbCursor *fb_cursor)
 
 #if (FB_API_VER >= 40)
 				case SQL_INT128:
-					if (var->sqlscale < 0) {
-						val = sql_decimal_to_bigdecimal(*(ISC_INT64*)var->sqldata, var->sqlscale);
-					} else {
-						val = LL2NUM(*(ISC_INT64*)var->sqldata);
-					}
+#if defined(__SIZEOF_INT128__)
+					val = fb_int128_to_value(var->sqldata, var->sqlscale);
+#else
+					rb_raise(rb_eFbError, "INT128 requires compiler support for __int128");
+#endif
 					break;
 #endif
 
@@ -2206,11 +2328,11 @@ static VALUE fb_cursor_read_returning(struct FbCursor *fb_cursor, struct FbConne
 
 #if (FB_API_VER >= 40)
 				case SQL_INT128:
-					if (var->sqlscale < 0) {
-						val = sql_decimal_to_bigdecimal(*(ISC_INT64*)var->sqldata, var->sqlscale);
-					} else {
-						val = LL2NUM(*(ISC_INT64*)var->sqldata);
-					}
+#if defined(__SIZEOF_INT128__)
+					val = fb_int128_to_value(var->sqldata, var->sqlscale);
+#else
+					rb_raise(rb_eFbError, "INT128 requires compiler support for __int128");
+#endif
 					break;
 #endif
 
@@ -3342,4 +3464,6 @@ void Init_fb()
 	id_rstrip_bang = rb_intern("rstrip!");
     id_sub_bang = rb_intern("sub!");
     id_force_encoding = rb_intern("force_encoding");
+	id_mul = rb_intern("*");
+	id_div = rb_intern("/");
 }
